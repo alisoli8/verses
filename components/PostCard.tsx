@@ -1,9 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
 import type { User, VsPost, VsOption, Comment } from '../types';
-import { RiBookmarkFill, RiBookmarkLine, RiHeartFill, RiHeartLine, RiShare2Line, RiMore2Fill, RiCheckLine } from 'react-icons/ri';
+import { RiHeartFill, RiHeartLine, RiShare2Line, RiMore2Fill, RiCheckLine, RiEditLine, RiDeleteBinLine, RiFlag2Line, RiEyeOffLine } from 'react-icons/ri';
 import { BiMessageSquareDots } from 'react-icons/bi';
 import { FiThumbsUp } from 'react-icons/fi';
+import { PiHeartBold, PiHeartFill } from "react-icons/pi";
+import { HiOutlineBookmark } from 'react-icons/hi';
+import { HiBookmark } from "react-icons/hi2";
 
 interface PostCardProps {
   post: VsPost;
@@ -18,6 +21,10 @@ interface PostCardProps {
   onCommentClick?: () => void;
   onTitleClick?: () => void;
   onVotedCardClick?: () => void;
+  onEdit?: (postId: string) => void;
+  onDelete?: (postId: string) => void;
+  onReportDuplicate?: (postId: string) => void;
+  onHide?: (postId: string) => void;
 }
 
 const countTotalComments = (comments: Comment[]): number => {
@@ -66,7 +73,7 @@ const MatchUpSummary: React.FC<{post: VsPost}> = ({ post }) => {
         <div className="w-full h-full flex flex-col items-center justify-start text-white p-4 relative overflow-y-auto bg-gray-900">
             <div className="text-center pt-2 pb-4">
                 <h2 className="text-sm font-bold text-amber-400 uppercase tracking-widest">Champion</h2>
-                <h1 className="text-4xl font-extrabold text-shadow-lg mt-1">{post.champion?.name}</h1>
+                <h1 className="text-4xl font-extrabold mt-1">{post.champion?.name}</h1>
             </div>
             <div className="w-full space-y-2">
                 {sortedChallengers.map(challenger => {
@@ -101,9 +108,41 @@ const MatchUpSummary: React.FC<{post: VsPost}> = ({ post }) => {
 };
 
 
-const PostCard: React.FC<PostCardProps> = ({ post, isSaved, currentUser, isFollowing, onVote, onMatchUpVote, onToggleSave, onShare, onFollow, onCommentClick, onTitleClick, onVotedCardClick }) => {
+const PostCard: React.FC<PostCardProps> = ({ 
+  post, 
+  isSaved, 
+  currentUser, 
+  isFollowing, 
+  onVote, 
+  onMatchUpVote, 
+  onToggleSave, 
+  onShare, 
+  onFollow, 
+  onCommentClick, 
+  onTitleClick, 
+  onVotedCardClick,
+  onEdit,
+  onDelete,
+  onReportDuplicate,
+  onHide
+}) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likes || 0);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  // Close menu when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = () => {
+      if (showMoreMenu) {
+        setShowMoreMenu(false);
+      }
+    };
+
+    if (showMoreMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showMoreMenu]);
 
   const totalComments = useMemo(() => countTotalComments(post.comments), [post.comments]);
 
@@ -149,6 +188,31 @@ const PostCard: React.FC<PostCardProps> = ({ post, isSaved, currentUser, isFollo
     onShare(post.id);
   }
 
+  const handleMoreClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMoreMenu(!showMoreMenu);
+  };
+
+  const handleMenuAction = (action: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMoreMenu(false);
+    
+    switch (action) {
+      case 'edit':
+        onEdit?.(post.id);
+        break;
+      case 'delete':
+        onDelete?.(post.id);
+        break;
+      case 'report':
+        onReportDuplicate?.(post.id);
+        break;
+      case 'hide':
+        onHide?.(post.id);
+        break;
+    }
+  };
+
   if (!post.optionA || !post.optionB) {
       if (post.type === 'classic' || (post.type === 'match-up' && !post.champion)) {
           return null;
@@ -158,7 +222,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, isSaved, currentUser, isFollo
   const totalVotes = (post.optionA?.votes ?? 0) + (post.optionB?.votes ?? 0);
 
   return (
-    <div className="bg-white dark:bg-gray-800/50 rounded-3xl shadow-md flex flex-col w-full border border-gray-200 dark:border-gray-700/50 overflow-hidden">
+    <div className="dark:bg-gray-800/50 rounded-2xl flex flex-col w-full border border-gray-200 dark:border-gray-700/50 overflow-hidden">
         <div className="flex items-center p-3 border-b border-gray-200 dark:border-gray-700/50">
             <img src={post.author.profileImageUrl} alt={post.author.name} className="w-9 h-9 rounded-full object-cover" />
             <div className="ml-3 flex items-center">
@@ -173,36 +237,124 @@ const PostCard: React.FC<PostCardProps> = ({ post, isSaved, currentUser, isFollo
                 )}
             </div>
             <div className="flex-grow"></div>
-             <button onClick={handleShareClick} className="p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
+             <button onClick={handleShareClick} className="p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white mr-3">
                 <RiShare2Line className="w-6 h-6" />
             </button>
-            <button className="p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
-                <RiMore2Fill className="w-6 h-6" />
-            </button>
+            <div className="relative">
+                <button onClick={handleMoreClick} className="p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
+                    <RiMore2Fill className="w-6 h-6" />
+                </button>
+                
+                {showMoreMenu && (
+                    <div className="absolute right-0 top-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-48">
+                        {currentUser.id === post.author.id ? (
+                            // Creator options
+                            <>
+                                <button
+                                    onClick={(e) => handleMenuAction('edit', e)}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                                >
+                                    <RiEditLine className="w-4 h-4" />
+                                    Edit Post
+                                </button>
+                                <button
+                                    onClick={(e) => handleMenuAction('delete', e)}
+                                    className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                                >
+                                    <RiDeleteBinLine className="w-4 h-4" />
+                                    Delete Post
+                                </button>
+                            </>
+                        ) : (
+                            // General user options
+                            <>
+                                <button
+                                    onClick={(e) => handleMenuAction('report', e)}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                                >
+                                    <RiFlag2Line className="w-4 h-4" />
+                                    Report as Duplicate
+                                </button>
+                                <button
+                                    onClick={(e) => handleMenuAction('hide', e)}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                                >
+                                    <RiEyeOffLine className="w-4 h-4" />
+                                    Hide Post
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
 
-        <div className="relative w-full bg-black" style={{ aspectRatio: '1 / 1' }}>
+        <div className="relative w-full bg-black" style={{ aspectRatio: post.aspectRatio || '1 / 1.3' }}>
           {post.type === 'match-up' && post.champion ? (
             <MatchUpSummary post={post} />
            ) : post.type === 'classic' && post.userVote !== null ? (
-             <div className="flex h-full cursor-pointer" onClick={onVotedCardClick}>
+             <div className="relative h-full overflow-hidden cursor-pointer" onClick={onVotedCardClick}>
                 {(() => {
                     const isWinnerA = post.optionA!.votes >= post.optionB!.votes;
                     const isWinnerB = post.optionB!.votes > post.optionA!.votes;
 
-                    const ResultImage = ({ option, isWinner, isVoted }: { option: VsOption, isWinner: boolean, isVoted: boolean }) => {
+                    const ResultImage = ({ option, isWinner, isVoted, side }: { option: VsOption, isWinner: boolean, isVoted: boolean, side: 'A' | 'B' }) => {
                         const percentage = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
+                        const backgroundColor = option.backgroundColor || (side === 'A' ? '#000000' : '#000000');
+                        // Use cover by default, but if user has positioned the image (non-default transform), use contain with their positioning
+                        const hasCustomTransform = option.imageTransform && (
+                            option.imageTransform.scale !== 1 || 
+                            option.imageTransform.translateX !== 0 || 
+                            option.imageTransform.translateY !== 0
+                        );
+                        const imageTransform = option.imageTransform || { scale: 1, translateX: 0, translateY: 0, objectFit: 'cover' };
+                        
                         return (
-                            <div className={`w-1/2 h-full relative transition-opacity duration-500 ${isWinner ? 'opacity-100' : 'opacity-60'}`}>
-                                <img src={option.imageUrl} alt={option.name} className="w-full h-full object-cover" />
-                                {isVoted && (
-                                    <div className="absolute top-2 right-2 bg-brand-lime text-black rounded-full p-1 shadow-lg">
-                                        <RiCheckLine className="w-4 h-4" />
-                                    </div>
+                            <div 
+                                className={`absolute inset-0 w-full h-full transition-opacity duration-500 ${isWinner ? 'opacity-100' : 'opacity-95'}`}
+                                style={{
+                                    clipPath: side === 'A' 
+                                        ? 'polygon(0% 0%, 46% 0%, 52% 100%, 0% 100%)' 
+                                        : 'polygon(46% 0%, 100% 0%, 100% 100%, 52% 100%)',
+                                    backgroundColor,
+                                    transformOrigin: 'center center'
+                                }}
+                            >
+                                {hasCustomTransform ? (
+                                    <img 
+                                        src={option.imageUrl} 
+                                        alt={option.name} 
+                                        className="absolute select-none"
+                                        style={{
+                                            top: '50%',
+                                            left: '50%',
+                                            width: 'auto',
+                                            height: 'auto',
+                                            maxWidth: '100%',
+                                            maxHeight: '100%',
+                                            objectFit: 'contain',
+                                            transform: `translate(-50%, -50%) scale(${imageTransform.scale}) translate(${imageTransform.translateX}px, ${imageTransform.translateY}px)`,
+                                            transformOrigin: 'center'
+                                        }}
+                                    />
+                                ) : (
+                                    <img 
+                                        src={option.imageUrl} 
+                                        alt={option.name} 
+                                        className="w-full h-full"
+                                        style={{
+                                            objectFit: 'cover'
+                                        }}
+                                    />
                                 )}
-                                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4 text-white">
-                                    <p className={`font-black text-5xl text-shadow-lg ${isWinner ? 'text-white' : 'text-gray-300'}`}>{percentage}%</p>
-                                    <p className="text-base font-semibold text-gray-300 text-shadow-md mt-1">{option.votes.toLocaleString()} votes</p>
+                                {/* {isVoted && (
+                                    <div className="absolute top-3 right-3 bg-brand-lime text-black rounded-full p-1.5 shadow-lg z-10">
+                                        <RiCheckLine className="w-5 h-5" />
+                                    </div>
+                                )} */}
+                                <div className={`absolute inset-0 ${isWinner ? 'bg-black/30' : 'bg-black/50'} flex flex-col justify-end p-6 text-white ${side === 'A' ? 'text-left' : 'text-right'}`}>
+                                    <h3 className={`font-bold text-7xl leading-[.6] tracking-[-3px] ${isWinner ? 'text-brand-lime' : 'text-gray-200'}`}>{percentage}<span className="text-4xl ml-1">%</span></h3>
+                                    <h5 className={`text-base font-semibold ${isWinner ? 'text-brand-lime' : 'text-gray-300'}`}>{option.votes.toLocaleString()} votes</h5>
                                 </div>
                             </div>
                         );
@@ -210,32 +362,97 @@ const PostCard: React.FC<PostCardProps> = ({ post, isSaved, currentUser, isFollo
 
                     return (
                         <>
-                            <ResultImage option={post.optionA!} isWinner={isWinnerA} isVoted={post.userVote === 'A'} />
-                            <ResultImage option={post.optionB!} isWinner={isWinnerB} isVoted={post.userVote === 'B'} />
+                            <ResultImage option={post.optionA!} isWinner={isWinnerA} isVoted={post.userVote === 'A'} side="A" />
+                            <ResultImage option={post.optionB!} isWinner={isWinnerB} isVoted={post.userVote === 'B'} side="B" />
+                            
+                            {/* VS Separator Image for voted state */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                              <img 
+                                src="/img/vs-bk.svg" 
+                                alt="VS" 
+                                className="w-[18%] h-[104%] object-contain drop-shadow-lg"
+                                onError={(e) => {
+                                  // Fallback to text if image doesn't exist
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const fallback = target.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
+                              {/* <div className="w-12 h-12 bg-black/80 backdrop-blur-sm rounded-full items-center justify-center border-2 border-white/80 hidden">
+                                <span className="text-white font-black text-xl" style={{ fontFamily: 'Inter, sans-serif' }}>VS</span>
+                              </div> */}
+                            </div>
                         </>
                     );
                 })()}
             </div>
           ) : (
-            <div className="flex h-full">
+            <div className="relative h-full overflow-hidden">
                {['A', 'B'].map((side) => {
                     const option = side === 'A' ? post.optionA! : post.optionB!;
                     const isRoundVoted = post.type === 'match-up' && post.currentRoundVoted;
                     const userPickedThis = isRoundVoted && post.userPicks?.includes(option.name);
                     const showThumbsUp = post.type === 'match-up' && !post.champion && !isRoundVoted && post.userChampionSide === side;
                     const percentage = isRoundVoted && totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
+                    const backgroundColor = option.backgroundColor || (side === 'A' ? '#000000' : '#000000');
+                    // Use cover by default, but if user has positioned the image (non-default transform), use contain with their positioning
+                    const hasCustomTransform = option.imageTransform && (
+                        option.imageTransform.scale !== 1 || 
+                        option.imageTransform.translateX !== 0 || 
+                        option.imageTransform.translateY !== 0
+                    );
+                    const imageTransform = option.imageTransform || { scale: 1, translateX: 0, translateY: 0, objectFit: 'cover' };
 
                     return (
-                         <div key={side} className={`w-1/2 h-full relative group ${isRoundVoted ? '' : 'cursor-pointer'}`} onClick={() => handleSideClick(side as 'A'|'B')}>
+                         <div 
+                            key={side} 
+                            className={`absolute inset-0 w-[54%] h-full group ${isRoundVoted ? '' : 'cursor-pointer'}`} 
+                            style={{
+                                clipPath: side === 'A' 
+                                    ? 'polygon(85% 0%, 0% 0%, 0% 100%, 95% 100%)' 
+                                    : 'polygon(2% 0%, 100% 0%, 100% 100%, 12% 100%)',
+                                backgroundColor,
+                                transformOrigin: 'center center',
+                                marginLeft: side === 'B' ? 'auto' : '0',
+                            }}
+                            onClick={() => handleSideClick(side as 'A'|'B')}
+                         >
                             {showThumbsUp && (
                                 <div className="absolute top-3 left-3 z-10 p-1.5 bg-black/50 rounded-full">
                                     <FiThumbsUp className="w-6 h-6 text-brand-lime" />
                                 </div>
                             )}
-                            <img src={option.imageUrl} alt={option.name} className="w-full h-full object-cover" />
-                            <div className="absolute bottom-0 left-0 right-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent"></div>
+                            {hasCustomTransform ? (
+                                <img 
+                                    src={option.imageUrl} 
+                                    alt={option.name} 
+                                    className="absolute select-none"
+                                    style={{
+                                        top: '50%',
+                                        left: '50%',
+                                        width: 'auto',
+                                        height: 'auto',
+                                        maxWidth: '100%',
+                                        maxHeight: '100%',
+                                        objectFit: 'contain',
+                                        transform: `translate(-50%, -50%) scale(${imageTransform.scale}) translate(${imageTransform.translateX}px, ${imageTransform.translateY}px)`,
+                                        transformOrigin: 'center'
+                                    }}
+                                />
+                            ) : (
+                                <img 
+                                    src={option.imageUrl} 
+                                    alt={option.name} 
+                                    className="w-full h-full"
+                                    style={{
+                                        objectFit: 'cover'
+                                    }}
+                                />
+                            )}
+                            <div className="absolute bottom-0 left-0 right-0 h-1/5 bg-gradient-to-t from-black/60 to-transparent"></div>
                              
-                            <div className="absolute bottom-4 left-4 right-4 text-white text-center text-shadow-md">
+                            <div className={`absolute bottom-6 left-6 right-6 text-white ${side === 'A' ? 'text-left' : 'text-right'}`}>
                                 {isRoundVoted ? (
                                     <>
                                         <div className="flex items-center justify-center font-bold text-xl">
@@ -245,20 +462,31 @@ const PostCard: React.FC<PostCardProps> = ({ post, isSaved, currentUser, isFollo
                                         <p className="font-bold text-3xl mt-1">{percentage}%</p>
                                     </>
                                 ) : (
-                                    <p className="font-bold text-xl">{option.name}</p>
+                                    <h5 className="font-semibold text-md">{option.name}</h5>
                                 )}
                             </div>
                         </div>
                     );
                })}
-            </div>
-          )}
-          
-          {!(post.type === 'match-up' && post.champion) && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-12 h-12 bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/80">
-                  <span className="text-white font-black text-xl" style={{ fontFamily: 'Inter, sans-serif' }}>VS</span>
-              </div>
+               
+               {/* VS Separator Image */}
+               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                 <img 
+                   src="/img/vs-bk.svg" 
+                   alt="VS" 
+                   className="w-[18%] h-[104%] object-contain drop-shadow-lg"
+                   onError={(e) => {
+                     // Fallback to text if image doesn't exist
+                     const target = e.target as HTMLImageElement;
+                     target.style.display = 'none';
+                     const fallback = target.nextElementSibling as HTMLElement;
+                     if (fallback) fallback.style.display = 'flex';
+                   }}
+                 />
+                 {/* <div className="w-12 h-12 bg-black/80 backdrop-blur-sm rounded-full items-center justify-center border-2 border-white/80 hidden">
+                   <span className="text-white font-black text-xl" style={{ fontFamily: 'Inter, sans-serif' }}>VS</span>
+                 </div> */}
+               </div>
             </div>
           )}
         </div>
@@ -268,7 +496,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, isSaved, currentUser, isFollo
                 <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-1.5">
                          <button onClick={handleLikeClick} className={`p-1 -ml-1 transition-colors ${isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500 dark:hover:text-red-400'}`}>
-                            {isLiked ? <RiHeartFill className="w-7 h-7" /> : <RiHeartLine className="w-7 h-7" />}
+                            {isLiked ? <PiHeartBold size={24} /> : <PiHeartFill size={24} />}
                         </button>
                         {likeCount > 0 && <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{likeCount.toLocaleString()}</span>}
                     </div>
@@ -283,7 +511,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, isSaved, currentUser, isFollo
 
                 <div className="flex-grow" />
                 <button onClick={handleSaveClick} className="p-1" aria-label="Save post">
-                    {isSaved ? <RiBookmarkFill className="w-7 h-7 text-brand-lime" /> : <RiBookmarkLine className="w-7 h-7 text-gray-500 hover:text-brand-lime/80 dark:hover:text-brand-lime" />}
+                    {isSaved ? <HiBookmark className="w-7 h-7 text-brand-lime" /> : <HiOutlineBookmark className="w-7 h-7 text-gray-500 hover:text-brand-lime/80 dark:hover:text-brand-lime" />}
                 </button>
             </div>
             

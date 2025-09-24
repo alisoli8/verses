@@ -30,7 +30,7 @@ const AppShareModal: React.FC<{ post: VsPost, onClose: () => void }> = ({ post, 
       try {
         await navigator.share({
           title: `Vote now: ${post.title}`,
-          text: `Who will win? Cast your vote for "${post.title}" on AI VS Arena!`,
+          text: `Who will win? Cast your vote for "${post.title}" on Verses!`,
           url: window.location.href,
         });
         onClose();
@@ -465,6 +465,27 @@ const App: React.FC = () => {
     });
   }, [currentUserId]);
 
+  const handleEditPost = useCallback((postId: string) => {
+    // For now, just show an alert - in a real app this would open an edit modal
+    alert(`Edit post ${postId} - This would open an edit modal in a real implementation`);
+  }, []);
+
+  const handleDeletePost = useCallback((postId: string) => {
+    if (confirm('Are you sure you want to delete this post?')) {
+      setPosts(prevPosts => prevPosts.filter(p => p.id !== postId));
+      alert('Post deleted successfully!');
+    }
+  }, []);
+
+  const handleReportDuplicate = useCallback((postId: string) => {
+    alert(`Reported post ${postId} as duplicate - This would be sent to moderators in a real implementation`);
+  }, []);
+
+  const handleHidePost = useCallback((postId: string) => {
+    // In a real app, this would hide the post from the user's feed
+    alert(`Hidden post ${postId} - This would hide the post from your feed in a real implementation`);
+  }, []);
+
   const handleShowUserList = useCallback((listType: 'followers' | 'following', userIds: Set<string>) => {
       setUserListSheetState({
           isOpen: true,
@@ -514,6 +535,10 @@ const App: React.FC = () => {
                     onToggleSave={handleToggleSave}
                     onClassicVote={handleClassicVote}
                     onSharePost={handleSharePost}
+                    onEditPost={handleEditPost}
+                    onDeletePost={handleDeletePost}
+                    onReportDuplicate={handleReportDuplicate}
+                    onHidePost={handleHidePost}
                 />;
       case View.SAVED:
         return <SavedView
@@ -544,7 +569,7 @@ const App: React.FC = () => {
         return <SettingsView user={currentUser} onBack={handleBackFromSettings} onUpdateUser={handleUpdateUser} theme={theme} onToggleTheme={handleToggleTheme} onLogout={handleLogout} />;
       case View.FEED:
       default:
-        return <FeedView user={currentUser} onSelectPost={handleSelectPost} onToggleSave={handleToggleSave} posts={posts} showHighlights={true} emptyStateMessage="Welcome! Create a post to get started." onClassicVote={handleClassicVote} onMatchUpVote={handleMatchUpVote} onSharePost={handleSharePost} onCommentClick={handleOpenComments} onFollow={handleFollowToggle} />;
+        return <FeedView user={currentUser} onSelectPost={handleSelectPost} onToggleSave={handleToggleSave} posts={posts} showHighlights={true} emptyStateMessage="Welcome! Create a post to get started." onClassicVote={handleClassicVote} onMatchUpVote={handleMatchUpVote} onSharePost={handleSharePost} onCommentClick={handleOpenComments} onFollow={handleFollowToggle} onEditPost={handleEditPost} onDeletePost={handleDeletePost} onReportDuplicate={handleReportDuplicate} onHidePost={handleHidePost} />;
     }
   };
 
@@ -552,7 +577,7 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-brand-off-white dark:bg-black text-gray-800 dark:text-gray-100 min-h-screen antialiased flex flex-col">
-       <main className={`flex-grow p-1 ${showNavBar ? 'pb-20' : ''}`}>{renderContent()}</main>
+       <main className={`flex-grow ${showNavBar ? 'pb-20' : ''}`}>{renderContent()}</main>
        {showNavBar && <BottomNavBar currentView={currentView} onNavigate={handleNavigate} />}
        {sharePost && <AppShareModal post={sharePost} onClose={handleCloseShareModal} />}
        <CommentSheet
