@@ -14,6 +14,10 @@ interface FeedViewProps {
   onSharePost: (id: string) => void;
   onCommentClick: (postId: string) => void;
   onFollow: (authorId: string) => void;
+  onEditPost?: (postId: string) => void;
+  onDeletePost?: (postId: string) => void;
+  onReportDuplicate?: (postId: string) => void;
+  onHidePost?: (postId: string) => void;
   title?: string;
   emptyStateMessage: string;
   showHighlights?: boolean;
@@ -22,7 +26,7 @@ interface FeedViewProps {
 const TabButton = ({ label, isActive, onClick }: { label: string, isActive: boolean, onClick: () => void }) => (
     <button 
       onClick={onClick} 
-      className={`flex-1 py-2.5 px-2 text-sm font-bold text-center rounded-2xl transition-all duration-300 focus:outline-none ${
+      className={`flex-1 py-2.5 px-2 text-sm font-bold text-center rounded-xl transition-all duration-300 focus:outline-none ${
         isActive 
           ? 'bg-gray-800 text-brand-lime dark:bg-gray-200 dark:text-black shadow' 
           : 'bg-gray-100 text-black dark:bg-gray-700 dark:text-gray-300'
@@ -32,7 +36,24 @@ const TabButton = ({ label, isActive, onClick }: { label: string, isActive: bool
     </button>
 );
 
-const FeedView: React.FC<FeedViewProps> = ({ posts, user, onSelectPost, onToggleSave, onClassicVote, onMatchUpVote, onSharePost, title, emptyStateMessage, showHighlights = false, onCommentClick, onFollow }) => {
+const FeedView: React.FC<FeedViewProps> = ({ 
+  posts, 
+  user, 
+  onSelectPost, 
+  onToggleSave, 
+  onClassicVote, 
+  onMatchUpVote, 
+  onSharePost, 
+  onCommentClick, 
+  onFollow,
+  onEditPost,
+  onDeletePost,
+  onReportDuplicate,
+  onHidePost,
+  title, 
+  emptyStateMessage, 
+  showHighlights = false 
+}) => {
   const [activeTab, setActiveTab] = useState<'for_you' | 'following' | 'match_up'>('for_you');
   const latestPosts = showHighlights ? posts.slice(0, 44) : [];
 
@@ -58,9 +79,9 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, user, onSelectPost, onToggle
   return (
     <div>
       {showHighlights && (
-        <div className="sticky top-0 bg-brand-off-white/80 dark:bg-black/80 backdrop-blur-lg z-10 py-3 border-b border-gray-200 dark:border-gray-800">
-          <div className="max-w-xl mx-auto px-4">
-            <div className="bg-gray-200 dark:bg-gray-800 p-1 rounded-3xl flex items-center space-x-1">
+        <div className="sticky top-0 bg-brand-off-white/80 rounded-b-2xl dark:bg-black/80 backdrop-blur-lg z-50 py-3">
+          <div className="max-w-xl mx-auto px-1">
+            <div className="bg-gray-200 dark:bg-gray-800 p-1 rounded-xl flex items-center space-x-1">
                 <TabButton label="For you" isActive={activeTab === 'for_you'} onClick={() => setActiveTab('for_you')} />
                 <TabButton label="Following" isActive={activeTab === 'following'} onClick={() => setActiveTab('following')} />
                 <TabButton label="Match ups" isActive={activeTab === 'match_up'} onClick={() => setActiveTab('match_up')} />
@@ -79,7 +100,7 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, user, onSelectPost, onToggle
             <p className="text-gray-500 dark:text-gray-400">{currentEmptyMessage}</p>
           </div>
         ) : (
-          <div className="flex flex-col space-y-4 sm:space-y-6 py-4">
+          <div className="flex flex-col space-y-4 sm:space-y-6 px-2 py-4">
             {displayedPosts.map(post => (
               <PostCard 
                 key={post.id} 
@@ -95,6 +116,10 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, user, onSelectPost, onToggle
                 onCommentClick={() => onCommentClick(post.id)}
                 onTitleClick={() => onSelectPost(post.id)}
                 onVotedCardClick={() => onSelectPost(post.id, true)}
+                onEdit={onEditPost}
+                onDelete={onDeletePost}
+                onReportDuplicate={onReportDuplicate}
+                onHide={onHidePost}
               />
             ))}
           </div>

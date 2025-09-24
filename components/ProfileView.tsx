@@ -66,13 +66,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, allUsers, myPosts, vote
     <div className="min-h-full">
         <div className="max-w-2xl mx-auto">
             {/* START: Profile Header from Image */}
-            <div className="bg-brand-lime text-black rounded-3xl shadow-lg p-5 m-2 sm:m-0">
+            <div className="bg-brand-lime text-black rounded-b-[3em] py-12 px-5 sm:m-0">
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                         <img 
                             src={user.profileImageUrl} 
                             alt={user.name}
-                            className="w-20 h-20 rounded-2xl object-cover bg-gray-500/20 shadow-md"
+                            className="w-20 h-20 rounded-xl object-cover bg-gray-500/20 shadow-md"
                         />
                         <div>
                             <h1 className="text-2xl font-bold">@{user.name}</h1>

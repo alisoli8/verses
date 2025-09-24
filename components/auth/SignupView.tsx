@@ -32,7 +32,7 @@ const SignupView: React.FC<SignupViewProps> = ({ onBack, onSignup, onGoToLogin }
       </header>
       <main className="flex-grow flex flex-col justify-center">
         <div className="w-full max-w-sm mx-auto">
-          <h1 className="text-4xl font-bold text-center mb-8">Join the Arena</h1>
+          <h1 className="text-4xl font-bold text-center mb-8">Join the Verses</h1>
           <form onSubmit={handleSubmit} className="space-y-4">
              <div>
               <label htmlFor="name" className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</label>

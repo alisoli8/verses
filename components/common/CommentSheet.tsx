@@ -20,7 +20,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, user, onReply, onTog
         <div className={`flex items-start gap-3 ${level > 0 ? 'ml-6' : ''}`}>
             <img src={comment.author.profileImageUrl} alt={comment.author.name} className="w-9 h-9 rounded-full object-cover flex-shrink-0 mt-1" />
             <div className="flex-grow">
-                <div className="bg-gray-800/80 rounded-2xl p-3">
+                <div className="bg-gray-800/80 rounded-xl p-3">
                     <p className="font-semibold text-sm text-gray-200">{comment.author.name}</p>
                     <p className="text-gray-300 whitespace-pre-wrap">{comment.text}</p>
                 </div>

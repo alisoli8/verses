@@ -10,10 +10,14 @@ interface SearchViewProps {
   onToggleSave: (id: string) => void;
   onClassicVote: (id: string, option: 'A' | 'B') => void;
   onSharePost: (id: string) => void;
+  onEditPost?: (postId: string) => void;
+  onDeletePost?: (postId: string) => void;
+  onReportDuplicate?: (postId: string) => void;
+  onHidePost?: (postId: string) => void;
 }
 
 const PostGridItem: React.FC<{ post: VsPost, onSelect: (id: string, showComments?: boolean) => void }> = ({ post, onSelect }) => (
-    <div className="relative aspect-square bg-gray-200 dark:bg-gray-800 cursor-pointer group" onClick={() => onSelect(post.id)}>
+    <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 cursor-pointer group" onClick={() => onSelect(post.id)}>
         <img src={post.optionA?.imageUrl} alt={post.optionA?.name} className="absolute top-0 left-0 w-1/2 h-full object-cover" />
         <img src={post.optionB?.imageUrl} alt={post.optionB?.name} className="absolute top-0 right-0 w-1/2 h-full object-cover" />
         <div className="absolute inset-0 bg-black/10 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center">
@@ -45,7 +49,7 @@ const SearchResultItem: React.FC<{ post: VsPost, onSelect: (id: string, showComm
 };
 
 
-const SearchView: React.FC<SearchViewProps> = ({ posts, user, onSelectPost, onToggleSave, onClassicVote, onSharePost }) => {
+const SearchView: React.FC<SearchViewProps> = ({ posts, user, onSelectPost, onToggleSave, onClassicVote, onSharePost, onEditPost, onDeletePost, onReportDuplicate, onHidePost }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredPosts = useMemo(() => {
@@ -97,7 +101,7 @@ const SearchView: React.FC<SearchViewProps> = ({ posts, user, onSelectPost, onTo
                     )}
                 </div>
             ) : (
-                <div className="grid grid-cols-3 gap-0.5 pt-0.5">
+                <div className="grid grid-cols-2 p-2 gap-0.5 pt-0.5">
                     {posts.map(post => (
                         <PostGridItem key={`grid-${post.id}`} post={post} onSelect={onSelectPost} />
                     ))}

@@ -27,7 +27,7 @@ const SavedView: React.FC<SavedViewProps> = ({ posts, user, onSelectPost, onTogg
     <div className="min-h-full flex flex-col">
         <div className="sticky top-0 bg-brand-off-white/80 dark:bg-black/80 backdrop-blur-lg z-10 p-4 pt-6 border-b border-gray-200 dark:border-gray-800">
              <div className="max-w-2xl mx-auto">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Saved Posts</h1>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Saved Posts</h3>
             </div>
         </div>
          <div className="max-w-2xl mx-auto w-full p-2 sm:p-4">

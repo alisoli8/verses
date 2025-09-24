@@ -1,8 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { RiArrowLeftLine, RiMagicLine, RiImageLine, RiAddLine, RiCloseLine, RiMicLine } from 'react-icons/ri';
+import { RiArrowLeftLine, RiMagicLine, RiAddLine, RiCloseLine, RiMicLine, RiEditLine, RiUploadLine } from 'react-icons/ri';
 import Spinner from './common/Spinner';
 import { generateImage } from '../services/geminiService';
+import ImageSelectionModal from './common/ImageSelectionModal';
+import ImageEditor from './common/ImageEditor';
+import InteractiveImage from './common/InteractiveImage';
 import type { VsPost } from '../types';
+import { LuImage } from 'react-icons/lu';
 
 declare global {
     interface Window {
@@ -31,6 +35,12 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, onClose, onCreat
   const [images, setImages] = useState<{ A: string | null, B: string | null }>({ A: null, B: null });
   const [loadingImages, setLoadingImages] = useState<{ A: boolean, B: boolean }>({ A: false, B: false });
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [backgroundColors, setBackgroundColors] = useState<{ A: string, B: string }>({ A: '#000000', B: '#000000' });
+  const [aspectRatio, setAspectRatio] = useState<'1/1' | '1/1.3'>('1/1.3');
+  const [imageTransforms, setImageTransforms] = useState<{ A: any, B: any }>({ 
+    A: { scale: 1, translateX: 0, translateY: 0, objectFit: 'cover' },
+    B: { scale: 1, translateX: 0, translateY: 0, objectFit: 'cover' }
+  });
   
   // Match-up state
   const [matchUpDetails, setMatchUpDetails] = useState({ title: '', challengers: '' });
@@ -41,6 +51,13 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, onClose, onCreat
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imageTarget, setImageTarget] = useState<'A' | 'B' | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageModalTarget, setImageModalTarget] = useState<'A' | 'B' | null>(null);
+  
+  // Image editor state
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [imageEditorTarget, setImageEditorTarget] = useState<'A' | 'B' | null>(null);
+  const [imageEditorUrl, setImageEditorUrl] = useState<string>('');
   
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -137,8 +154,21 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, onClose, onCreat
     } else if (step === 'images' && creationType === 'classic') {
         const finalPost: Omit<VsPost, 'id' | 'userVote' | 'author' | 'comments' | 'topic' | 'type'> = {
             title: classicDetails.title,
-            optionA: { name: classicDetails.optionA_name, imageUrl: images.A!, votes: 0 },
-            optionB: { name: classicDetails.optionB_name, imageUrl: images.B!, votes: 0 },
+            aspectRatio,
+            optionA: { 
+                name: classicDetails.optionA_name, 
+                imageUrl: images.A!, 
+                votes: 0,
+                backgroundColor: backgroundColors.A,
+                imageTransform: imageTransforms.A
+            },
+            optionB: { 
+                name: classicDetails.optionB_name, 
+                imageUrl: images.B!, 
+                votes: 0,
+                backgroundColor: backgroundColors.B,
+                imageTransform: imageTransforms.B
+            },
             likes: 0,
             shares: 0
         };
@@ -155,7 +185,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, onClose, onCreat
     if(isProcessing) return true;
     if (step === 'details') {
       if (creationType === 'classic') {
-        return !classicDetails.title.trim() || !classicDetails.optionA_name.trim() || !classicDetails.optionB_name.trim() || !!duplicateError;
+        return !classicDetails.optionA_name.trim() || !classicDetails.optionB_name.trim() || !!duplicateError;
       }
       const challengers = matchUpDetails.challengers.split(',').map(c => c.trim()).filter(Boolean);
       return !matchUpDetails.title.trim() || challengers.length < 8 || challengers.length > 30;
@@ -169,6 +199,44 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, onClose, onCreat
   const handleUploadImageClick = (target: 'A' | 'B') => {
     setImageTarget(target);
     fileInputRef.current?.click();
+  };
+
+  const handleSelectImageClick = (target: 'A' | 'B') => {
+    setImageModalTarget(target);
+    setShowImageModal(true);
+  };
+
+  const handleEditImageClick = (target: 'A' | 'B') => {
+    const imageUrl = images[target];
+    if (imageUrl) {
+      setImageEditorTarget(target);
+      setImageEditorUrl(imageUrl);
+      setShowImageEditor(true);
+    }
+  };
+
+  const handleImageEditorSave = (editedImageUrl: string, backgroundColor?: string) => {
+    if (imageEditorTarget) {
+      setImages(prev => ({ ...prev, [imageEditorTarget]: editedImageUrl }));
+      if (backgroundColor) {
+        setBackgroundColors(prev => ({ ...prev, [imageEditorTarget]: backgroundColor }));
+      }
+    }
+    setShowImageEditor(false);
+    setImageEditorTarget(null);
+    setImageEditorUrl('');
+  };
+
+  const handleImageTransformChange = (target: 'A' | 'B', transform: any) => {
+    setImageTransforms(prev => ({ ...prev, [target]: transform }));
+  };
+
+  const handleImageSelected = (imageUrl: string) => {
+    if (imageModalTarget) {
+      setImages(prev => ({ ...prev, [imageModalTarget]: imageUrl }));
+    }
+    setShowImageModal(false);
+    setImageModalTarget(null);
   };
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,10 +297,10 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, onClose, onCreat
         if (creationType === 'classic') {
           return (
             <div className="p-8 w-full max-w-lg mx-auto">
-              <p className="text-center text-gray-500 dark:text-gray-400 mb-8">This will be the main title for your VS battle.</p>
+              <p className="text-center text-gray-500 dark:text-gray-400 mb-8">Add an optional caption for your VS battle.</p>
               <input
                   type="text"
-                  placeholder="Example: The Ultimate Showdown"
+                  placeholder="Optional: Add a caption or leave blank"
                   value={classicDetails.title}
                   onChange={e => setClassicDetails(prev => ({ ...prev, title: e.target.value }))}
                   className="w-full text-center text-lg bg-transparent border-b-2 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 focus:border-brand-lime focus:ring-0 outline-none p-2 mb-12 transition-colors"
@@ -303,44 +371,126 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, onClose, onCreat
       case 'images':
         return (
             <div className="flex-grow flex flex-col w-full bg-brand-off-white dark:bg-gray-900">
-                <p className="text-center text-gray-500 dark:text-gray-400 mt-2 mb-4">{classicDetails.optionA_name} vs {classicDetails.optionB_name}</p>
-                <div className="flex-grow flex w-full">
+                <p className="text-center text-gray-500 dark:text-gray-400 mt-2 mb-2">{classicDetails.optionA_name} vs {classicDetails.optionB_name}</p>
+                
+                {/* Aspect Ratio Controls */}
+                <div className="flex justify-center mb-4">
+                    <div className="flex bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm">
+                        <button
+                            onClick={() => setAspectRatio('1/1.2')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                aspectRatio === '1/1.2'
+                                    ? 'bg-brand-lime text-black'
+                                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                            }`}
+                        >
+                            Square (1:1.2)
+                        </button>
+                        <button
+                            onClick={() => setAspectRatio('1/1.5')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                aspectRatio === '1/1.5'
+                                    ? 'bg-brand-lime text-black'
+                                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                            }`}
+                        >
+                            Portrait (1:1.5)
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="flex justify-center items-center w-full flex-grow">
+                    <div className="relative w-full max-w-md" style={{ aspectRatio }}>
                     {[
                         { target: 'A', color: 'bg-red-500', name: classicDetails.optionA_name, image: images.A, loading: loadingImages.A },
                         { target: 'B', color: 'bg-cyan-500', name: classicDetails.optionB_name, image: images.B, loading: loadingImages.B }
                     ].map(opt => (
-                        <div key={opt.target} className={`w-1/2 h-full flex flex-col items-center justify-center p-4 relative ${opt.color} text-white`}>
+                        <div 
+                            key={opt.target} 
+                            className="absolute inset-0 w-[52%] h-full flex flex-col items-center justify-center text-white"
+                            style={{ 
+                                backgroundColor: opt.image ? backgroundColors[opt.target as 'A' | 'B'] : (opt.target === 'A' ? '#444' : '#ededed'),
+                                clipPath: opt.target === 'A' 
+                                    ? 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)' 
+                                    : 'polygon(0% 0%, 100% 0%, 100% 100%, 7% 100%)',
+                                transformOrigin: 'center center',
+                                marginLeft: opt.target === 'B' ? 'auto' : '0',
+                            }}
+                        >
                             {opt.image ? (
-                                <img src={opt.image} alt={opt.name} className="absolute inset-0 w-full h-full object-cover" />
+                                <>
+                                    <InteractiveImage
+                                        src={opt.image}
+                                        alt={opt.name}
+                                        containerClassName="absolute inset-0"
+                                        initialTransform={imageTransforms[opt.target as 'A' | 'B']}
+                                        onTransformChange={(transform) => handleImageTransformChange(opt.target as 'A' | 'B', transform)}
+                                        showControls={true}
+                                    />
+                                    {/* Edit button overlay */}
+                                    <button
+                                        onClick={() => handleEditImageClick(opt.target as 'A' | 'B')}
+                                        className="absolute top-2 right-2 p-2 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black/70 transition-colors z-30"
+                                        title="Edit Image"
+                                    >
+                                        <RiEditLine className="w-5 h-5 text-white" />
+                                    </button>
+                                </>
                             ) : opt.loading ? (
                                 <div className="flex items-center justify-center h-full"> <Spinner /> </div>
                             ) : (
                                 <div className="text-center">
-                                    <RiImageLine className="w-16 h-16 mx-auto opacity-80" />
-                                    <p className="font-bold text-lg mt-2 text-shadow-md">{opt.name}</p>
+                                    <LuImage className="w-16 h-16 mx-auto opacity-80" />
+                                    <p className="font-bold text-lg mt-2">{opt.name}</p>
                                 </div>
                             )}
-                            <div className="absolute bottom-6 space-y-3 w-[calc(100%-2rem)] z-10">
+                            <div className="absolute bottom-6 left-4 right-4 space-y-3 z-10">
+                                <button 
+                                    onClick={() => handleSelectImageClick(opt.target as 'A' | 'B')} 
+                                    className="w-full bg-black/25 backdrop-blur-sm py-3 px-4 rounded-xl hover:bg-black/40 transition-colors font-semibold text-sm disabled:opacity-50"
+                                    disabled={opt.loading}
+                                >
+                                    <LuImage className="w-4 h-4 inline mr-2" />
+                                    {opt.image ? 'Change Image' : 'Select Image'}
+                                </button>
                                 <button 
                                     onClick={() => handleUploadImageClick(opt.target as 'A' | 'B')} 
                                     className="w-full bg-black/25 backdrop-blur-sm py-3 px-4 rounded-xl hover:bg-black/40 transition-colors font-semibold text-sm disabled:opacity-50"
                                     disabled={opt.loading}
                                 >
+                                    <RiUploadLine className="w-4 h-4 inline mr-2" />
                                     Upload Image
                                 </button>
-                                <button 
+                                {/* <button 
                                     onClick={() => handleGenerateImage(opt.target as 'A' | 'B')} 
-                                    className="w-full flex items-center justify-center gap-2 bg-black/25 backdrop-blur-sm py-3 px-4 rounded-xl hover:bg-black/40 transition-colors font-semibold text-sm disabled:opacity-50"
+                                    className="w-full bg-black/25 backdrop-blur-sm py-3 px-4 rounded-xl hover:bg-black/40 transition-colors font-semibold text-sm disabled:opacity-50"
                                     disabled={opt.loading}
                                 >
-                                    <RiMagicLine className="w-5 h-5" />
-                                    <span>Generate with AI</span>
-                                </button>
+                                    <RiMagicLine className="w-4 h-4 inline mr-2" />
+                                    Generate with AI
+                                </button> */}
                             </div>
                         </div>
                     ))}
+                    
+                    {/* VS Separator Image */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                        <img 
+                            src="/img/vs-bk.svg" 
+                            alt="VS" 
+                            className="w-[18%] h-[104%] object-contain drop-shadow-lg"
+                            onError={(e) => {
+                                // Fallback to text if image doesn't exist
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const fallback = target.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
+                            }}
+                        />
+                    </div>
                 </div>
-            </div>
+                    </div>
+                </div>
         );
     }
   };
@@ -383,6 +533,27 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, onClose, onCreat
             {renderStep()}
         </main>
         <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" accept="image/*" />
+        
+        {showImageModal && (
+          <ImageSelectionModal
+            isOpen={showImageModal}
+            onClose={() => setShowImageModal(false)}
+            onSelectImage={handleImageSelected}
+            searchQuery={imageModalTarget === 'A' ? classicDetails.optionA_name : classicDetails.optionB_name}
+            title={`Select Image for ${imageModalTarget === 'A' ? classicDetails.optionA_name : classicDetails.optionB_name}`}
+          />
+        )}
+
+        {showImageEditor && (
+          <ImageEditor
+            isOpen={showImageEditor}
+            imageUrl={imageEditorUrl}
+            onClose={() => setShowImageEditor(false)}
+            onSave={handleImageEditorSave}
+            title={`Edit Image for ${imageEditorTarget === 'A' ? classicDetails.optionA_name : classicDetails.optionB_name}`}
+            initialBackgroundColor={imageEditorTarget ? backgroundColors[imageEditorTarget] : '#000000'}
+          />
+        )}
     </div>
   )
 };
@@ -438,7 +609,7 @@ const CreateView: React.FC<CreateViewProps> = ({ posts, onBack, onCreateWithAI, 
 
       <div className="flex-grow flex flex-col items-center justify-center gap-8 px-4">
           <div 
-            className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-[0_10px_30px_-5px_rgba(212,255,0,0.1),_0_0_20px_rgba(212,255,0,0.05)] border border-yellow-300/30 dark:border-brand-lime/20"
+            className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-[0_10px_30px_-5px_rgba(212,255,0,0.1),_0_0_20px_rgba(212,255,0,0.05)] border border-yellow-300/30 dark:border-brand-lime/20"
           >
                <div className="flex items-center gap-3 justify-center mb-6">
                   <RiMagicLine className="w-7 h-7 text-yellow-400 dark:text-brand-lime" />

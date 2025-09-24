@@ -11,6 +11,16 @@ window.process = {
     // Get your Gemini API Key from Google AI Studio: https://aistudio.google.com/app/apikey
     API_KEY: 'YOUR_GEMINI_API_KEY',
 
+    // --- Image Search (Optional) ---
+    // Get your Bing Search API Key from Azure Cognitive Services: https://azure.microsoft.com/en-us/services/cognitive-services/bing-web-search-api/
+    // Free tier: 1,000 searches/month
+    VITE_BING_SEARCH_API_KEY: 'YOUR_BING_SEARCH_API_KEY',
+
+    // Get your Openverse API credentials from: https://api.openverse.org/v1/#tag/auth/operation/register
+    // Free Creative Commons and public domain images
+    VITE_OPENVERSE_CLIENT_ID: 'YOUR_OPENVERSE_CLIENT_ID',
+    VITE_OPENVERSE_CLIENT_SECRET: 'YOUR_OPENVERSE_CLIENT_SECRET',
+
     // --- Future Database Integration (Guidelines) ---
     // When you're ready to connect a real backend, you can add your credentials here.
     // The application code would then need to be updated to read these values.
