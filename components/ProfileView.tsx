@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import type { User, VsPost, VsOption } from '../types';
 import { View } from '../types';
 import { RiSettings4Line } from 'react-icons/ri';
-import PostCard from './PostCard';
+import { PostMasonryGrid } from './SearchView';
 
 interface ProfileViewProps {
   user: User;
@@ -37,10 +37,10 @@ const ProfileMetric = ({ value, label }: { value: number; label: string }) => (
 const ProfileTabButton = ({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void }) => (
     <button
       onClick={onClick}
-      className={`flex-1 py-2 text-sm font-bold rounded-full transition-colors duration-200 ${
+      className={`flex-1 py-2 text-sm font-bold rounded-full transition-colors duration-200 relative z-10 ${
         isActive
-          ? 'bg-black text-white dark:bg-white dark:text-black shadow'
-          : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10'
+          ? 'text-white dark:text-black'
+          : 'text-gray-500 dark:text-gray-400'
       }`}
     >
         {label}
@@ -50,6 +50,42 @@ const ProfileTabButton = ({ label, isActive, onClick }: { label: string; isActiv
 
 const ProfileView: React.FC<ProfileViewProps> = ({ user, allUsers, myPosts, votedPosts, onNavigate, onSelectPost, onToggleSave, onClassicVote, onMatchUpVote, onSharePost, onCommentClick, onShowUserList, onFollowToggle }) => {
   const [activeTab, setActiveTab] = useState<'posts' | 'voted'>('posts');
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const tabOrder: Array<'posts' | 'voted'> = ['posts', 'voted'];
+  const activeTabIndex = tabOrder.indexOf(activeTab);
+
+  const handleSwipe = () => {
+    const swipeDistance = touchStartX.current - touchEndX.current;
+    const minSwipeDistance = 50;
+
+    if (Math.abs(swipeDistance) < minSwipeDistance) return;
+
+    if (swipeDistance > 0) {
+      // Swiped left - go to next tab
+      const nextIndex = activeTabIndex + 1;
+      if (nextIndex < tabOrder.length) {
+        setActiveTab(tabOrder[nextIndex]);
+      }
+    } else {
+      // Swiped right - go to previous tab
+      const prevIndex = activeTabIndex - 1;
+      if (prevIndex >= 0) {
+        setActiveTab(tabOrder[prevIndex]);
+      }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    handleSwipe();
+  };
 
   const stats = useMemo(() => {
     const createdCount = myPosts.length;
@@ -66,13 +102,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, allUsers, myPosts, vote
     <div className="min-h-full">
         <div className="max-w-2xl mx-auto">
             {/* START: Profile Header from Image */}
-            <div className="bg-brand-lime text-black rounded-b-[3em] py-12 px-5 sm:m-0">
+            <div className="bg-brand-lime text-black rounded-b-[3em] pt-12 pb-8 px-5 sm:m-0">
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                         <img 
                             src={user.profileImageUrl} 
                             alt={user.name}
-                            className="w-20 h-20 rounded-xl object-cover bg-gray-500/20 shadow-md"
+                            className="w-20 h-20 rounded-3xl object-cover bg-gray-500/20 shadow-md"
                         />
                         <div>
                             <h1 className="text-2xl font-bold">@{user.name}</h1>
@@ -86,7 +122,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, allUsers, myPosts, vote
                         <RiSettings4Line className="w-6 h-6" />
                     </button>
                 </div>
-                <div className="flex justify-around mt-6 pt-4 border-t border-black/10">
+                <div className="flex justify-around mt-6 pt-6 border-t border-black/10">
                     <ProfileMetric value={stats.createdCount} label="Created" />
                     <ProfileMetric value={stats.votedOnCount} label="Voted" />
                 </div>
@@ -94,36 +130,32 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, allUsers, myPosts, vote
             {/* END: Profile Header */}
         
             <div className="px-2 sm:px-0 py-4">
-                <div className="bg-gray-200/70 dark:bg-gray-800 p-1 rounded-full flex items-center space-x-1 my-4">
+                <div className="bg-gray-200/70 dark:bg-gray-800 p-1 rounded-2xl flex items-center space-x-1 my-4 relative">
+                    {/* Animated background indicator */}
+                    <div 
+                      className="absolute top-1 bottom-1 bg-black dark:bg-white rounded-2xl transition-all duration-300 ease-out"
+                      style={{
+                        left: `calc(${activeTabIndex * 50}% + 4px)`,
+                        width: 'calc(50% - 8px)'
+                      }}
+                    />
                     <ProfileTabButton label="My Posts" isActive={activeTab === 'posts'} onClick={() => setActiveTab('posts')} />
                     <ProfileTabButton label="Voted" isActive={activeTab === 'voted'} onClick={() => setActiveTab('voted')} />
                 </div>
                 
-                {displayedPosts.length === 0 ? (
-                    <div className="text-center py-20 px-4">
-                        <p className="text-gray-500 dark:text-gray-400">{emptyStateMessage}</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                        {displayedPosts.map(post => (
-                            <PostCard 
-                                key={post.id} 
-                                post={post}
-                                isSaved={user.savedPostIds.has(post.id)}
-                                currentUser={user}
-                                isFollowing={user.following.has(post.author.id)}
-                                onVote={onClassicVote}
-                                onMatchUpVote={onMatchUpVote}
-                                onToggleSave={onToggleSave}
-                                onShare={onSharePost}
-                                onFollow={onFollowToggle}
-                                onCommentClick={() => onCommentClick(post.id)}
-                                onTitleClick={() => onSelectPost(post.id)}
-                                onVotedCardClick={() => onSelectPost(post.id, true)}
-                            />
-                        ))}
-                    </div>
-                )}
+                <div
+                  ref={contentRef}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  {displayedPosts.length === 0 ? (
+                      <div className="text-center py-20 px-4">
+                          <p className="text-gray-500 dark:text-gray-400">{emptyStateMessage}</p>
+                      </div>
+                  ) : (
+                      <PostMasonryGrid posts={displayedPosts} onSelect={onSelectPost} />
+                  )}
+                </div>
             </div>
         </div>
     </div>

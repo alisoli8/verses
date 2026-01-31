@@ -5,7 +5,7 @@ import { FcGoogle } from 'react-icons/fc';
 
 interface LoginViewProps {
   onBack: () => void;
-  onLogin: (email: string) => void;
+  onLogin: (email: string, password: string) => void;
   onGoToSignup: () => void;
 }
 
@@ -17,7 +17,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onBack, onLogin, onGoToSignup }) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email && password) {
-      onLogin(email);
+      onLogin(email, password);
     }
   };
 

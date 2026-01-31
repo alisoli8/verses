@@ -1,5 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { RiExpandDiagonalLine, RiContractUpDownLine, RiDragMove2Line, RiCropLine } from 'react-icons/ri';
+import { RiExpandDiagonalLine, RiContractUpDownLine, RiDragMove2Line, RiCropLine, RiCheckLine, RiCloseLine } from 'react-icons/ri';
+import { MdOutlinePinch } from 'react-icons/md';
+import { PiResizeBold } from 'react-icons/pi';
 
 interface InteractiveImageProps {
   src: string;
@@ -9,7 +11,9 @@ interface InteractiveImageProps {
   onTransformChange?: (transform: ImageTransform) => void;
   initialTransform?: Partial<ImageTransform>;
   showControls?: boolean;
-  showCropBox?: boolean;
+  cropMode?: boolean;
+  onCropConfirm?: (croppedImageUrl: string) => void;
+  onCropCancel?: () => void;
   allowOverflow?: boolean;
 }
 
@@ -50,7 +54,9 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
   onTransformChange,
   initialTransform = { scale: 1, translateX: 0, translateY: 0, objectFit: 'scale-down' },
   showControls = true,
-  showCropBox = false,
+  cropMode = false,
+  onCropConfirm,
+  onCropCancel,
   allowOverflow = false
 }) => {
   const imageRef = useRef<HTMLImageElement>(null);
@@ -61,7 +67,7 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
     translateX: 0,
     translateY: 0,
     objectFit: 'scale-down',
-    cropBox: { x: 10, y: 10, width: 80, height: 80 },
+    cropBox: { x: 15, y: 15, width: 70, height: 70 },
     ...initialTransform
   }));
   
@@ -250,14 +256,32 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
       startCrop: { ...transform.cropBox }
     });
   };
+
+  const handleCropTouchStart = (e: React.TouchEvent, handle?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!transform.cropBox || e.touches.length === 0) return;
+    
+    const touch = e.touches[0];
+    setCropState({
+      isDragging: !handle,
+      isResizing: !!handle,
+      resizeHandle: handle || null,
+      startPos: { x: touch.clientX, y: touch.clientY },
+      startCrop: { ...transform.cropBox }
+    });
+  };
   
-  const handleCropMouseMove = useCallback((e: MouseEvent) => {
+  const handleCropMouseMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!cropState.isDragging && !cropState.isResizing) return;
     if (!transform.cropBox || !containerRef.current) return;
     
     const rect = containerRef.current.getBoundingClientRect();
-    const deltaX = ((e.clientX - cropState.startPos.x) / rect.width) * 100;
-    const deltaY = ((e.clientY - cropState.startPos.y) / rect.height) * 100;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const deltaX = ((clientX - cropState.startPos.x) / rect.width) * 100;
+    const deltaY = ((clientY - cropState.startPos.y) / rect.height) * 100;
     
     let newCropBox = { ...transform.cropBox };
     
@@ -313,9 +337,13 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
     if (cropState.isDragging || cropState.isResizing) {
       document.addEventListener('mousemove', handleCropMouseMove);
       document.addEventListener('mouseup', handleCropMouseUp);
+      document.addEventListener('touchmove', handleCropMouseMove);
+      document.addEventListener('touchend', handleCropMouseUp);
       return () => {
         document.removeEventListener('mousemove', handleCropMouseMove);
         document.removeEventListener('mouseup', handleCropMouseUp);
+        document.removeEventListener('touchmove', handleCropMouseMove);
+        document.removeEventListener('touchend', handleCropMouseUp);
       };
     }
   }, [cropState.isDragging, cropState.isResizing, handleCropMouseMove, handleCropMouseUp]);
@@ -331,6 +359,63 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
     };
     setTransform(resetTransform);
     onTransformChange?.(resetTransform);
+  };
+
+  // Crop the image
+  const handleCropConfirm = () => {
+    if (!imageRef.current || !containerRef.current || !transform.cropBox) return;
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const img = imageRef.current;
+    const container = containerRef.current;
+    const cropBox = transform.cropBox;
+    
+    // Calculate actual pixel positions
+    const containerRect = container.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
+    
+    // Convert percentage to pixels relative to container
+    const cropX = (cropBox.x / 100) * containerRect.width;
+    const cropY = (cropBox.y / 100) * containerRect.height;
+    const cropWidth = (cropBox.width / 100) * containerRect.width;
+    const cropHeight = (cropBox.height / 100) * containerRect.height;
+    
+    // Calculate offset from image to container
+    const offsetX = imgRect.left - containerRect.left;
+    const offsetY = imgRect.top - containerRect.top;
+    
+    // Source coordinates on the actual image
+    const scaleX = img.naturalWidth / imgRect.width;
+    const scaleY = img.naturalHeight / imgRect.height;
+    
+    const sourceX = Math.max(0, (cropX - offsetX) * scaleX);
+    const sourceY = Math.max(0, (cropY - offsetY) * scaleY);
+    const sourceWidth = Math.min(img.naturalWidth - sourceX, cropWidth * scaleX);
+    const sourceHeight = Math.min(img.naturalHeight - sourceY, cropHeight * scaleY);
+    
+    // Set canvas size to source dimensions to preserve quality
+    canvas.width = sourceWidth;
+    canvas.height = sourceHeight;
+    
+    // Draw cropped image at full resolution
+    ctx.drawImage(
+      img,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      sourceWidth,
+      sourceHeight
+    );
+    
+    // Convert to data URL with maximum quality
+    const croppedImageUrl = canvas.toDataURL('image/png');
+    onCropConfirm?.(croppedImageUrl);
   };
 
 
@@ -366,32 +451,45 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
         draggable={false}
       />
 
-      {/* Controls */}
-      {showControls && (
-        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
-          {/* Reset Button */}
+      {/* Always visible controls at top-left */}
+      <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+        {/* Pinch icon */}
+        <div className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-lg">
+          <MdOutlinePinch size={16} />
+        </div>
+        
+        {/* Reset/Resize Button */}
+        <button
+          onClick={resetImageTransform}
+          className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition-colors"
+          title="Reset Position & Scale"
+        >
+          <PiResizeBold size={16} />
+        </button>
+      </div>
+      
+      {/* Crop mode buttons - checkmark and close */}
+      {cropMode && (
+        <div className="absolute top-2 right-2 flex gap-2 z-10">
           <button
-            onClick={resetImageTransform}
-            className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition-colors"
-            title="Reset Position & Scale"
+            onClick={handleCropConfirm}
+            className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-lg"
+            title="Confirm Crop"
           >
-            <RiContractUpDownLine size={16} />
+            <RiCheckLine size={20} />
           </button>
-          
-          {/* Crop Toggle Button */}
-          {showCropBox && (
-            <button
-              className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition-colors"
-              title="Crop Tool"
-            >
-              <RiCropLine size={16} />
-            </button>
-          )}
+          <button
+            onClick={onCropCancel}
+            className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-lg"
+            title="Cancel Crop"
+          >
+            <RiCloseLine size={20} />
+          </button>
         </div>
       )}
 
       {/* Crop Box */}
-      {showCropBox && transform.cropBox && (
+      {cropMode && transform.cropBox && (
         <div 
           className="absolute border-2 border-white shadow-lg"
           style={{
@@ -402,6 +500,7 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
             cursor: cropState.isDragging ? 'grabbing' : 'grab'
           }}
           onMouseDown={(e) => handleCropMouseDown(e)}
+          onTouchStart={(e) => handleCropTouchStart(e)}
         >
           {/* Crop box overlay */}
           <div className="absolute inset-0 bg-black/20" />
@@ -410,31 +509,36 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
           {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map(handle => (
             <div
               key={handle}
-              className={`absolute w-3 h-3 bg-white border border-gray-400 ${
-                handle.includes('top') ? '-top-1.5' : '-bottom-1.5'
+              className={`absolute w-4 h-4 bg-white border border-gray-400 ${
+                handle.includes('top') ? '-top-2' : '-bottom-2'
               } ${
-                handle.includes('left') ? '-left-1.5' : '-right-1.5'
-              } cursor-nw-resize hover:bg-blue-500`}
+                handle.includes('left') ? '-left-2' : '-right-2'
+              } cursor-nw-resize hover:bg-blue-500 touch-none`}
               onMouseDown={(e) => handleCropMouseDown(e, handle)}
+              onTouchStart={(e) => handleCropTouchStart(e, handle)}
             />
           ))}
           
           {/* Edge handles */}
           <div 
-            className="absolute w-3 h-3 bg-white border border-gray-400 -top-1.5 left-1/2 transform -translate-x-1/2 cursor-n-resize hover:bg-blue-500"
+            className="absolute w-4 h-4 bg-white border border-gray-400 -top-2 left-1/2 transform -translate-x-1/2 cursor-n-resize hover:bg-blue-500 touch-none"
             onMouseDown={(e) => handleCropMouseDown(e, 'top')}
+            onTouchStart={(e) => handleCropTouchStart(e, 'top')}
           />
           <div 
-            className="absolute w-3 h-3 bg-white border border-gray-400 -bottom-1.5 left-1/2 transform -translate-x-1/2 cursor-s-resize hover:bg-blue-500"
+            className="absolute w-4 h-4 bg-white border border-gray-400 -bottom-2 left-1/2 transform -translate-x-1/2 cursor-s-resize hover:bg-blue-500 touch-none"
             onMouseDown={(e) => handleCropMouseDown(e, 'bottom')}
+            onTouchStart={(e) => handleCropTouchStart(e, 'bottom')}
           />
           <div 
-            className="absolute w-3 h-3 bg-white border border-gray-400 -left-1.5 top-1/2 transform -translate-y-1/2 cursor-w-resize hover:bg-blue-500"
+            className="absolute w-4 h-4 bg-white border border-gray-400 -left-2 top-1/2 transform -translate-y-1/2 cursor-w-resize hover:bg-blue-500 touch-none"
             onMouseDown={(e) => handleCropMouseDown(e, 'left')}
+            onTouchStart={(e) => handleCropTouchStart(e, 'left')}
           />
           <div 
-            className="absolute w-3 h-3 bg-white border border-gray-400 -right-1.5 top-1/2 transform -translate-y-1/2 cursor-e-resize hover:bg-blue-500"
+            className="absolute w-4 h-4 bg-white border border-gray-400 -right-2 top-1/2 transform -translate-y-1/2 cursor-e-resize hover:bg-blue-500 touch-none"
             onMouseDown={(e) => handleCropMouseDown(e, 'right')}
+            onTouchStart={(e) => handleCropTouchStart(e, 'right')}
           />
           
           {/* Grid lines */}
@@ -448,19 +552,18 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
       )}
 
       {/* Scale Indicator */}
-      {showControls && (transform.scale !== 1 || transform.translateX !== 0 || transform.translateY !== 0) && (
+      {/* {showControls && (transform.scale !== 1 || transform.translateX !== 0 || transform.translateY !== 0) && (
         <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs rounded">
           {Math.round(transform.scale * 100)}%
         </div>
-      )}
+      )} */}
 
-      {/* Instructions */}
-      {showControls && (
-        <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs rounded opacity-70">
-          <div className="hidden sm:block">Drag • Scroll to zoom</div>
-          <div className="sm:hidden">Drag • Pinch to zoom</div>
+      {/* Crop instructions */}
+      {/* {cropMode && (
+        <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 px-3 py-2 bg-black/70 backdrop-blur-sm text-white text-xs rounded-lg">
+          Drag to reposition • Drag handles to resize
         </div>
-      )}
+      )} */}
     </div>
   );
 };

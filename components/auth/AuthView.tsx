@@ -6,8 +6,8 @@ import SignupView from './SignupView';
 type AuthScreen = 'splash' | 'login' | 'signup';
 
 interface AuthViewProps {
-  onLogin: (email: string) => void;
-  onSignup: (name: string, email: string) => void;
+  onLogin: (email: string, password: string) => void;
+  onSignup: (name: string, email: string, password: string) => void;
 }
 
 const AuthView: React.FC<AuthViewProps> = ({ onLogin, onSignup }) => {
