@@ -222,9 +222,9 @@ const PostCard: React.FC<PostCardProps> = ({
   const totalVotes = (post.optionA?.votes ?? 0) + (post.optionB?.votes ?? 0);
 
   return (
-    <div className="dark:bg-gray-800/50 rounded-2xl flex flex-col w-full border border-gray-200 dark:border-gray-700/50 overflow-hidden">
+    <div className="dark:bg-gray-800/50 rounded-3xl flex flex-col w-full border border-gray-300 dark:border-gray-700/50 overflow-hidden">
         <div className="flex items-center p-3 border-b border-gray-200 dark:border-gray-700/50">
-            <img src={post.author.profileImageUrl} alt={post.author.name} className="w-9 h-9 rounded-full object-cover" />
+            <img src={post.author.profileImageUrl} alt={post.author.name} className="w-9 h-9 rounded-xl object-cover" />
             <div className="ml-3 flex items-center">
                 <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{post.author.name}</span>
                 {currentUser.id !== post.author.id && (
@@ -252,7 +252,13 @@ const PostCard: React.FC<PostCardProps> = ({
                             <>
                                 <button
                                     onClick={(e) => handleMenuAction('edit', e)}
-                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                                    disabled={totalVotes > 0}
+                                    className={`w-full px-4 py-2 text-left text-sm flex items-center gap-3 ${
+                                        totalVotes > 0 
+                                            ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed' 
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                    }`}
+                                    title={totalVotes > 0 ? 'Cannot edit post with votes' : ''}
                                 >
                                     <RiEditLine className="w-4 h-4" />
                                     Edit Post
@@ -289,11 +295,11 @@ const PostCard: React.FC<PostCardProps> = ({
             </div>
         </div>
 
-        <div className="relative w-full bg-black" style={{ aspectRatio: post.aspectRatio || '1 / 1.3' }}>
+        <div className="relative w-full bg-black" style={{ aspectRatio: post.aspectRatio || '1 / 1.5' }}>
           {post.type === 'match-up' && post.champion ? (
             <MatchUpSummary post={post} />
            ) : post.type === 'classic' && post.userVote !== null ? (
-             <div className="relative h-full overflow-hidden cursor-pointer" onClick={onVotedCardClick}>
+             <div className="relative h-full overflow-hidden">
                 {(() => {
                     const isWinnerA = post.optionA!.votes >= post.optionB!.votes;
                     const isWinnerB = post.optionB!.votes > post.optionA!.votes;
@@ -301,13 +307,12 @@ const PostCard: React.FC<PostCardProps> = ({
                     const ResultImage = ({ option, isWinner, isVoted, side }: { option: VsOption, isWinner: boolean, isVoted: boolean, side: 'A' | 'B' }) => {
                         const percentage = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
                         const backgroundColor = option.backgroundColor || (side === 'A' ? '#000000' : '#000000');
-                        // Use cover by default, but if user has positioned the image (non-default transform), use contain with their positioning
-                        const hasCustomTransform = option.imageTransform && (
-                            option.imageTransform.scale !== 1 || 
-                            option.imageTransform.translateX !== 0 || 
-                            option.imageTransform.translateY !== 0
-                        );
                         const imageTransform = option.imageTransform || { scale: 1, translateX: 0, translateY: 0, objectFit: 'cover' };
+                        const objectFit = imageTransform.objectFit || 'cover';
+                        // Check if user has custom scale/translate positioning
+                        const hasCustomPositioning = imageTransform.scale !== 1 || 
+                            imageTransform.translateX !== 0 || 
+                            imageTransform.translateY !== 0;
                         
                         return (
                             <div 
@@ -320,39 +325,43 @@ const PostCard: React.FC<PostCardProps> = ({
                                     transformOrigin: 'center center'
                                 }}
                             >
-                                {hasCustomTransform ? (
-                                    <img 
-                                        src={option.imageUrl} 
-                                        alt={option.name} 
-                                        className="absolute select-none"
-                                        style={{
-                                            top: '50%',
-                                            left: '50%',
-                                            width: 'auto',
-                                            height: 'auto',
-                                            maxWidth: '100%',
-                                            maxHeight: '100%',
-                                            objectFit: 'contain',
-                                            transform: `translate(-50%, -50%) scale(${imageTransform.scale}) translate(${imageTransform.translateX}px, ${imageTransform.translateY}px)`,
-                                            transformOrigin: 'center'
-                                        }}
-                                    />
-                                ) : (
-                                    <img 
-                                        src={option.imageUrl} 
-                                        alt={option.name} 
-                                        className="w-full h-full"
-                                        style={{
-                                            objectFit: 'cover'
-                                        }}
-                                    />
-                                )}
+                                <div className={`absolute inset-0 flex items-center ${side === 'A' ? 'justify-start' : 'justify-end'}`}>
+                                    <div className="relative w-[55%] h-full">
+                                        {hasCustomPositioning ? (
+                                            <img 
+                                                src={option.imageUrl} 
+                                                alt={option.name} 
+                                                className="absolute select-none"
+                                                style={{
+                                                    top: '50%',
+                                                    left: '50%',
+                                                    width: 'auto',
+                                                    height: 'auto',
+                                                    maxWidth: '100%',
+                                                    maxHeight: '100%',
+                                                    objectFit,
+                                                    transform: `translate(-50%, -50%) scale(${imageTransform.scale}) translate(${imageTransform.translateX}px, ${imageTransform.translateY}px)`,
+                                                    transformOrigin: 'center'
+                                                }}
+                                            />
+                                        ) : (
+                                            <img 
+                                                src={option.imageUrl} 
+                                                alt={option.name} 
+                                                className="w-full h-full"
+                                                style={{
+                                                    objectFit
+                                                }}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
                                 {/* {isVoted && (
                                     <div className="absolute top-3 right-3 bg-brand-lime text-black rounded-full p-1.5 shadow-lg z-10">
                                         <RiCheckLine className="w-5 h-5" />
                                     </div>
                                 )} */}
-                                <div className={`absolute inset-0 ${isWinner ? 'bg-black/30' : 'bg-black/50'} flex flex-col justify-end p-6 text-white ${side === 'A' ? 'text-left' : 'text-right'}`}>
+                                <div className={`absolute inset-0 ${isWinner ? 'bg-black/25' : 'bg-black/50'} flex flex-col justify-end p-6 text-white ${side === 'A' ? 'text-left' : 'text-right'}`}>
                                     <h3 className={`font-bold text-7xl leading-[.6] tracking-[-3px] ${isWinner ? 'text-brand-lime' : 'text-gray-200'}`}>{percentage}<span className="text-4xl ml-1">%</span></h3>
                                     <h5 className={`text-base font-semibold ${isWinner ? 'text-brand-lime' : 'text-gray-300'}`}>{option.votes.toLocaleString()} votes</h5>
                                 </div>
@@ -365,23 +374,22 @@ const PostCard: React.FC<PostCardProps> = ({
                             <ResultImage option={post.optionA!} isWinner={isWinnerA} isVoted={post.userVote === 'A'} side="A" />
                             <ResultImage option={post.optionB!} isWinner={isWinnerB} isVoted={post.userVote === 'B'} side="B" />
                             
-                            {/* VS Separator Image for voted state */}
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                              <img 
-                                src="/img/vs-bk.svg" 
-                                alt="VS" 
-                                className="w-[18%] h-[104%] object-contain drop-shadow-lg"
-                                onError={(e) => {
-                                  // Fallback to text if image doesn't exist
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = 'none';
-                                  const fallback = target.nextElementSibling as HTMLElement;
-                                  if (fallback) fallback.style.display = 'flex';
+                            {/* VS Separator with CSS divider and VS image */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 left-[-10px]">
+                              {/* Angled divider line */}
+                              <div 
+                                className="absolute h-full w-[6px] bg-gradient-to-b from-black via-white/80 to-black"
+                                style={{
+                                  transform: 'rotate(-2deg)',
                                 }}
                               />
-                              {/* <div className="w-12 h-12 bg-black/80 backdrop-blur-sm rounded-full items-center justify-center border-2 border-white/80 hidden">
-                                <span className="text-white font-black text-xl" style={{ fontFamily: 'Inter, sans-serif' }}>VS</span>
-                              </div> */}
+                              
+                              {/* VS image in center */}
+                              <img 
+                                src="/img/vs.svg" 
+                                alt="VS" 
+                                className="w-14 h-auto drop-shadow-lg"
+                              />
                             </div>
                         </>
                     );
@@ -396,18 +404,17 @@ const PostCard: React.FC<PostCardProps> = ({
                     const showThumbsUp = post.type === 'match-up' && !post.champion && !isRoundVoted && post.userChampionSide === side;
                     const percentage = isRoundVoted && totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
                     const backgroundColor = option.backgroundColor || (side === 'A' ? '#000000' : '#000000');
-                    // Use cover by default, but if user has positioned the image (non-default transform), use contain with their positioning
-                    const hasCustomTransform = option.imageTransform && (
-                        option.imageTransform.scale !== 1 || 
-                        option.imageTransform.translateX !== 0 || 
-                        option.imageTransform.translateY !== 0
-                    );
                     const imageTransform = option.imageTransform || { scale: 1, translateX: 0, translateY: 0, objectFit: 'cover' };
+                    const objectFit = imageTransform.objectFit || 'cover';
+                    // Check if user has custom scale/translate positioning
+                    const hasCustomPositioning = imageTransform.scale !== 1 || 
+                        imageTransform.translateX !== 0 || 
+                        imageTransform.translateY !== 0;
 
                     return (
                          <div 
                             key={side} 
-                            className={`absolute inset-0 w-[54%] h-full group ${isRoundVoted ? '' : 'cursor-pointer'}`} 
+                            className={`absolute inset-0 w-[55%] h-full group ${isRoundVoted ? '' : 'cursor-pointer'}`} 
                             style={{
                                 clipPath: side === 'A' 
                                     ? 'polygon(85% 0%, 0% 0%, 0% 100%, 95% 100%)' 
@@ -423,7 +430,7 @@ const PostCard: React.FC<PostCardProps> = ({
                                     <FiThumbsUp className="w-6 h-6 text-brand-lime" />
                                 </div>
                             )}
-                            {hasCustomTransform ? (
+                            {hasCustomPositioning ? (
                                 <img 
                                     src={option.imageUrl} 
                                     alt={option.name} 
@@ -435,7 +442,7 @@ const PostCard: React.FC<PostCardProps> = ({
                                         height: 'auto',
                                         maxWidth: '100%',
                                         maxHeight: '100%',
-                                        objectFit: 'contain',
+                                        objectFit,
                                         transform: `translate(-50%, -50%) scale(${imageTransform.scale}) translate(${imageTransform.translateX}px, ${imageTransform.translateY}px)`,
                                         transformOrigin: 'center'
                                     }}
@@ -446,7 +453,7 @@ const PostCard: React.FC<PostCardProps> = ({
                                     alt={option.name} 
                                     className="w-full h-full"
                                     style={{
-                                        objectFit: 'cover'
+                                        objectFit
                                     }}
                                 />
                             )}
@@ -469,23 +476,22 @@ const PostCard: React.FC<PostCardProps> = ({
                     );
                })}
                
-               {/* VS Separator Image */}
-               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                 <img 
-                   src="/img/vs-bk.svg" 
-                   alt="VS" 
-                   className="w-[18%] h-[104%] object-contain drop-shadow-lg"
-                   onError={(e) => {
-                     // Fallback to text if image doesn't exist
-                     const target = e.target as HTMLImageElement;
-                     target.style.display = 'none';
-                     const fallback = target.nextElementSibling as HTMLElement;
-                     if (fallback) fallback.style.display = 'flex';
+               {/* VS Separator with CSS divider and VS image */}
+               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 left-[-10px]">
+                 {/* Angled divider line */}
+                 <div 
+                   className="absolute h-full w-[6px] bg-gradient-to-b from-black via-white/80 to-black"
+                   style={{
+                     transform: 'rotate(-2deg)',
                    }}
                  />
-                 {/* <div className="w-12 h-12 bg-black/80 backdrop-blur-sm rounded-full items-center justify-center border-2 border-white/80 hidden">
-                   <span className="text-white font-black text-xl" style={{ fontFamily: 'Inter, sans-serif' }}>VS</span>
-                 </div> */}
+                 
+                 {/* VS image in center */}
+                 <img 
+                   src="/img/vs.svg" 
+                   alt="VS" 
+                   className="w-14 h-auto drop-shadow-lg"
+                 />
                </div>
             </div>
           )}
@@ -496,7 +502,7 @@ const PostCard: React.FC<PostCardProps> = ({
                 <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-1.5">
                          <button onClick={handleLikeClick} className={`p-1 -ml-1 transition-colors ${isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500 dark:hover:text-red-400'}`}>
-                            {isLiked ? <PiHeartBold size={24} /> : <PiHeartFill size={24} />}
+                            {isLiked ? <PiHeartFill size={24} /> : <PiHeartBold size={24} />}
                         </button>
                         {likeCount > 0 && <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{likeCount.toLocaleString()}</span>}
                     </div>
@@ -511,7 +517,7 @@ const PostCard: React.FC<PostCardProps> = ({
 
                 <div className="flex-grow" />
                 <button onClick={handleSaveClick} className="p-1" aria-label="Save post">
-                    {isSaved ? <HiBookmark className="w-7 h-7 text-brand-lime" /> : <HiOutlineBookmark className="w-7 h-7 text-gray-500 hover:text-brand-lime/80 dark:hover:text-brand-lime" />}
+                    {isSaved ? <HiBookmark className="w-7 h-7 text-gray-700 dark:text-brand-lime" /> : <HiOutlineBookmark className="w-7 h-7 text-gray-500 hover:text-brand-lime/80 dark:hover:text-brand-lime" />}
                 </button>
             </div>
             
@@ -532,6 +538,11 @@ const PostCard: React.FC<PostCardProps> = ({
                     <span className="font-bold hover:underline">{post.author.name}</span>
                     <span className="text-gray-600 dark:text-gray-400"> {post.title}</span>
                 </p>
+                {post.optionA && post.optionB && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {post.optionA.name} <span className="text-gray-600 dark:text-gray-400">vs</span> {post.optionB.name}
+                    </p>
+                )}
             </div>
         </div>
     </div>

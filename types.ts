@@ -50,7 +50,7 @@ export interface VsPost {
   userVote: 'A' | 'B' | null;
   likes: number;
   shares: number;
-  aspectRatio?: '1/1' | '1/1.3';
+  aspectRatio?: '1/1.2' | '1/1.5';
 
   // For Classic mode, or the current round in Match-up
   optionA?: VsOption;

@@ -36,7 +36,7 @@ const NavItem = ({
 
 const BottomNavBar: React.FC<BottomNavBarProps> = ({ currentView, onNavigate }) => {
   return (
-    <nav className="fixed bottom-2 left-0 right-0 m-auto w-[90%] h-20 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg rounded-[2em] flex items-center justify-around z-40">
+    <nav className="fixed bottom-2 px-2 left-0 right-0 m-auto w-[90%] h-20 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md rounded-[2em] flex items-center justify-around z-40">
       <div className="flex justify-around items-center w-full max-w-xl mx-auto">
         <div className="flex justify-center w-1/5">
             <NavItem 

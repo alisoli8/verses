@@ -1,5 +1,5 @@
 
-# AI VS Arena
+# Verses.fun
 
 A fun and engaging social platform where users can prompt an AI to generate creative 'versus' battles and then vote on them. See real-time results and discover endless imaginative matchups.
 

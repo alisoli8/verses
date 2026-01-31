@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { VsPost, User, VsOption } from '../types';
 import PostCard from './PostCard';
 import HighlightsView from './HighlightsView';
@@ -26,10 +26,10 @@ interface FeedViewProps {
 const TabButton = ({ label, isActive, onClick }: { label: string, isActive: boolean, onClick: () => void }) => (
     <button 
       onClick={onClick} 
-      className={`flex-1 py-2.5 px-2 text-sm font-bold text-center rounded-xl transition-all duration-300 focus:outline-none ${
+      className={`flex-1 py-2.5 px-2 text-sm font-bold text-center rounded-full transition-all duration-300 focus:outline-none relative z-10 ${
         isActive 
-          ? 'bg-gray-800 text-brand-lime dark:bg-gray-200 dark:text-black shadow' 
-          : 'bg-gray-100 text-black dark:bg-gray-700 dark:text-gray-300'
+          ? 'text-brand-lime dark:text-black' 
+          : 'text-gray-600 dark:text-gray-300'
       }`}
     >
         {label}
@@ -55,7 +55,67 @@ const FeedView: React.FC<FeedViewProps> = ({
   showHighlights = false 
 }) => {
   const [activeTab, setActiveTab] = useState<'for_you' | 'following' | 'match_up'>('for_you');
+  const [showTabs, setShowTabs] = useState(true);
+  const lastScrollY = useRef(0);
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+  const contentRef = useRef<HTMLDivElement>(null);
   const latestPosts = showHighlights ? posts.slice(0, 44) : [];
+
+  const tabOrder: Array<'for_you' | 'following' | 'match_up'> = ['for_you', 'following', 'match_up'];
+  const activeTabIndex = tabOrder.indexOf(activeTab);
+
+  const handleSwipe = () => {
+    const swipeDistance = touchStartX.current - touchEndX.current;
+    const minSwipeDistance = 50;
+
+    if (Math.abs(swipeDistance) < minSwipeDistance) return;
+
+    if (swipeDistance > 0) {
+      // Swiped left - go to next tab
+      const nextIndex = activeTabIndex + 1;
+      if (nextIndex < tabOrder.length) {
+        setActiveTab(tabOrder[nextIndex]);
+      }
+    } else {
+      // Swiped right - go to previous tab
+      const prevIndex = activeTabIndex - 1;
+      if (prevIndex >= 0) {
+        setActiveTab(tabOrder[prevIndex]);
+      }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    handleSwipe();
+  };
+
+  useEffect(() => {
+    if (!showHighlights) return;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Show tabs when scrolling up, hide when scrolling down
+      if (currentScrollY < lastScrollY.current) {
+        // Scrolling up
+        setShowTabs(true);
+      } else if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        // Scrolling down (and past 50px to avoid hiding immediately)
+        setShowTabs(false);
+      }
+      
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [showHighlights]);
 
   const displayedPosts = useMemo(() => {
     if (!showHighlights) return posts;
@@ -79,9 +139,20 @@ const FeedView: React.FC<FeedViewProps> = ({
   return (
     <div>
       {showHighlights && (
-        <div className="sticky top-0 bg-brand-off-white/80 rounded-b-2xl dark:bg-black/80 backdrop-blur-lg z-50 py-3">
-          <div className="max-w-xl mx-auto px-1">
-            <div className="bg-gray-200 dark:bg-gray-800 p-1 rounded-xl flex items-center space-x-1">
+        <div 
+          className="sticky top-0 bg-brand-off-white/80 rounded-b-2xl dark:bg-black/80 backdrop-blur-lg z-50 py-3 transition-transform duration-300 ease-in-out"
+          style={{ transform: showTabs ? 'translateY(0)' : 'translateY(-100%)' }}
+        >
+          <div className="max-w-xl mx-auto px-3">
+            <div className="bg-[#f1efe9] dark:bg-gray-800 p-1 rounded-2xl flex items-center space-x-1 relative">
+                {/* Animated background indicator */}
+                <div 
+                  className="absolute top-1 bottom-1 bg-gray-800 dark:bg-gray-200 rounded-2xl transition-all duration-300 ease-out"
+                  style={{
+                    left: `calc(${activeTabIndex * 33.333}% + 4px)`,
+                    width: 'calc(33.333% - 8px)'
+                  }}
+                />
                 <TabButton label="For you" isActive={activeTab === 'for_you'} onClick={() => setActiveTab('for_you')} />
                 <TabButton label="Following" isActive={activeTab === 'following'} onClick={() => setActiveTab('following')} />
                 <TabButton label="Match ups" isActive={activeTab === 'match_up'} onClick={() => setActiveTab('match_up')} />
@@ -90,8 +161,13 @@ const FeedView: React.FC<FeedViewProps> = ({
         </div>
       )}
 
-      <div className="max-w-xl mx-auto">
-        {showHighlights && activeTab === 'for_you' && <div className="pt-6 px-2"><HighlightsView posts={latestPosts} onSelectPost={onSelectPost} /></div>}
+      <div 
+        ref={contentRef}
+        className="max-w-xl mx-auto"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {showHighlights && activeTab === 'for_you' && <div className="pt-4 px-2"><HighlightsView posts={latestPosts} onSelectPost={onSelectPost} /></div>}
         
         {title && <h1 className={`text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6 px-4 ${showHighlights ? 'mt-8' : ''}`}>{title}</h1>}
         

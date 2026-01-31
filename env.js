@@ -11,13 +11,16 @@ window.process = {
 
     // --- Database Configuration (Supabase Recommended) ---
     // Create account at https://supabase.com and get these from your project settings
-    SUPABASE_URL: 'YOUR_SUPABASE_PROJECT_URL',
-    SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY',
+    SUPABASE_URL: 'https://jadzbyvvdiyccwvmrexk.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphZHpieXZ2ZGl5Y2N3dm1yZXhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NzI3NTEsImV4cCI6MjA4NDQ0ODc1MX0.Eoxr3Y-cCBcUEIbcwfTZAwJLCLX9B9m86rGDhmYReLU',
     SUPABASE_SERVICE_ROLE_KEY: 'YOUR_SUPABASE_SERVICE_ROLE_KEY', // For admin operations
 
     // --- Authentication Configuration ---
     // These will be used when implementing real auth
     AUTH_REDIRECT_URL: 'http://localhost:5173/auth/callback',
+
+    VITE_OPENVERSE_CLIENT_ID: 'FtzCY2OWaceV5jjTHsy9hnJVGZq5ryUldHkZCD22',
+    VITE_OPENVERSE_CLIENT_SECRET: 'wJRXqAwZd9WzuTWjOl7UULeDSGjPMjE2mi2XSVaadqKhiEK6RtVb2o44ko3fjIxoLPUHDXRhmZlmOMwshHCGbDBRQvjBoe5w66tDdscLrbkyRb18hBqoPYnOuGehl2l5'
     
     // --- Optional: Firebase Alternative ---
     // Uncomment if you choose Firebase instead of Supabase

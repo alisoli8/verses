@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { RiCloseLine, RiSearchLine, RiUploadLine, RiSparklingLine, RiGlobalLine, RiCreativeCommonsLine } from 'react-icons/ri';
-import { ImageResult, ImageSearchOptions, searchImages, uploadToCloudinary } from '../../services/imageService';
+import { uploadToCloudinary } from '../../services/imageService';
 import { generateImage } from '../../services/geminiService';
 import { bingImageService, BingImageResult } from '../../services/bingImageService';
 import { openverseService, OpenverseImageResult } from '../../services/openverseService';
-import { LuImage } from 'react-icons/lu';
 
 interface ImageSelectionModalProps {
   isOpen: boolean;
@@ -14,7 +13,7 @@ interface ImageSelectionModalProps {
   title?: string;
 }
 
-type TabType = 'ai' | 'stock' | 'bing' | 'openverse';
+type TabType = 'ai' | 'bing' | 'openverse';
 
 const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
   isOpen,
@@ -26,7 +25,6 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('ai');
   const [query, setQuery] = useState(searchQuery);
   const [loading, setLoading] = useState(false);
-  const [stockImages, setStockImages] = useState<ImageResult[]>([]);
   const [bingImages, setBingImages] = useState<BingImageResult[]>([]);
   const [openverseImages, setOpenverseImages] = useState<OpenverseImageResult[]>([]);
   const [aiImage, setAiImage] = useState<string | null>(null);
@@ -35,40 +33,13 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
   useEffect(() => {
     if (isOpen && searchQuery) {
       setQuery(searchQuery);
-      if (activeTab === 'stock') {
-        handleStockSearch();
-      } else if (activeTab === 'bing') {
+      if (activeTab === 'bing') {
         handleBingSearch();
       } else if (activeTab === 'openverse') {
         handleOpenverseSearch();
       }
     }
   }, [isOpen, searchQuery, activeTab]);
-
-  const handleStockSearch = async () => {
-    if (!query.trim()) return;
-    
-    setLoading(true);
-    try {
-      const results = await searchImages({ 
-        query: query.trim(),
-        count: 20,
-        orientation: 'landscape'
-      });
-      
-      // Use Unsplash results
-      const combinedResults = [
-        ...results.unsplash,
-        ...results.google.slice(0, 8) // Limit Google results
-      ];
-      
-      setStockImages(combinedResults);
-    } catch (error) {
-      console.error('Image search failed:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleBingSearch = async () => {
     if (!query.trim()) return;
@@ -161,119 +132,96 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleSearch = () => {
+    if (activeTab === 'bing') handleBingSearch();
+    else if (activeTab === 'openverse') handleOpenverseSearch();
+    else if (activeTab === 'ai') handleAiGeneration();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
+    <div className="fixed inset-0 bg-[#f1efe9] dark:bg-gray-900 z-50 flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-6 flex-shrink-0">
+        <button
+          onClick={onClose}
+          className="text-gray-800 dark:text-gray-200"
+        >
+          <RiCloseLine className="w-7 h-7" />
+        </button>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
+        <div className="w-7" /> {/* Spacer for centering */}
+      </header>
+
+      {/* Search Bar */}
+      <div className="px-6 pb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search for images..."
+              className="w-full text-lg bg-transparent border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-gray-900 dark:focus:border-white focus:ring-0 outline-none pb-3 transition-colors"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSearch();
+              }}
+            />
+          </div>
           <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            onClick={handleSearch}
+            disabled={loading || !query.trim()}
+            className="w-12 h-12 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-black flex items-center justify-center hover:bg-gray-800 dark:hover:bg-gray-100 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
           >
-            <RiCloseLine className="w-6 h-6 text-gray-500" />
+            {loading ? (
+              <span className="w-5 h-5 border-2 border-white dark:border-black border-t-transparent rounded-full animate-spin"></span>
+            ) : (
+              <RiSearchLine className="w-5 h-5" />
+            )}
           </button>
         </div>
+      </div>
 
-        {/* Search Bar */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search for images..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (activeTab === 'stock') handleStockSearch();
-                    else if (activeTab === 'bing') handleBingSearch();
-                    else if (activeTab === 'openverse') handleOpenverseSearch();
-                    else if (activeTab === 'ai') handleAiGeneration();
-                  }
-                }}
-              />
-            </div>
-            <button
-              onClick={() => {
-                if (activeTab === 'stock') handleStockSearch();
-                else if (activeTab === 'bing') handleBingSearch();
-                else if (activeTab === 'openverse') handleOpenverseSearch();
-                else if (activeTab === 'ai') handleAiGeneration();
-              }}
-              disabled={loading || !query.trim()}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
-            >
-              {loading ? 'Searching...' : 'Search'}
-            </button>
-          </div>
+      {/* Tabs */}
+      <div className="px-6 pb-4 overflow-x-auto">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('ai')}
+            className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-full transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
+              activeTab === 'ai'
+                ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+            }`}
+          >
+            <RiSparklingLine className="w-4 h-4" />
+            AI Generate
+          </button>
+          <button
+            onClick={() => setActiveTab('bing')}
+            className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-full transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
+              activeTab === 'bing'
+                ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+            }`}
+          >
+            <RiGlobalLine className="w-4 h-4" />
+            Web
+          </button>
+          <button
+            onClick={() => setActiveTab('openverse')}
+            className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-full transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
+              activeTab === 'openverse'
+                ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+            }`}
+          >
+            <RiCreativeCommonsLine className="w-4 h-4" />
+            Openverse
+          </button>
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-          <div className="flex min-w-max">
-            <button
-              onClick={() => setActiveTab('ai')}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'ai'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <RiSparklingLine className="w-5 h-5" />
-              AI Generated
-            </button>
-            <button
-              onClick={() => setActiveTab('bing')}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'bing'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <RiGlobalLine className="w-5 h-5" />
-              Web Images
-            </button>
-            <button
-              onClick={() => setActiveTab('openverse')}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'openverse'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <RiCreativeCommonsLine className="w-5 h-5" />
-              Openverse
-            </button>
-            <button
-              onClick={() => setActiveTab('stock')}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'stock'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <LuImage className="w-5 h-5" />
-              Stock Photos
-            </button>
-            {/* <button
-              onClick={() => setActiveTab('upload')}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'upload'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <RiUploadLine className="w-5 h-5" />
-              Upload
-            </button> */}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-96">
+      {/* Content */}
+      <div className="flex-1 px-6 pb-6 overflow-y-auto">
           {/* AI Generated Tab */}
           {activeTab === 'ai' && (
             <div className="space-y-4">
@@ -353,47 +301,6 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
                       ⚠️ Bing API key not configured. Please add VITE_BING_SEARCH_API_KEY to your environment.
                     </p>
                   )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Stock Photos Tab */}
-          {activeTab === 'stock' && (
-            <div>
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <span className="ml-3 text-gray-600 dark:text-gray-400">Searching images...</span>
-                </div>
-              ) : stockImages.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {stockImages.map((image) => (
-                    <div
-                      key={image.id}
-                      className="relative cursor-pointer group rounded-lg overflow-hidden"
-                      onClick={() => handleImageSelect(image.url)}
-                    >
-                      <img
-                        src={image.thumbnail}
-                        alt={image.title || 'Stock photo'}
-                        className="w-full h-32 object-cover group-hover:scale-105 transition-transform"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <span className="text-white opacity-0 group-hover:opacity-100 font-medium text-sm">Select</span>
-                      </div>
-                      {image.attribution && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 truncate">
-                          {image.attribution}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                  <LuImage className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Search for stock photos using the search bar above</p>
                 </div>
               )}
             </div>
@@ -493,7 +400,6 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 };

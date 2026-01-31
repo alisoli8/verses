@@ -7,10 +7,11 @@ const replicate = new Replicate({
 
 export const generateImageWithStableDiffusion = async (name: string, topic: string): Promise<string> => {
   try {
-    // Optimized prompt for small images and object recognition
-    const prompt = `professional product photo of ${name}, clean white background, centered, high contrast, sharp focus, commercial photography style, ${topic} context, realistic, detailed`;
+    // Optimized prompt for simple subject queries (single words like "mountain", "BMW", "Sushi", celebrity names)
+    // The prompt is designed to work with short, simple inputs and generate recognizable, high-quality images
+    const prompt = `A stunning, high-quality photograph of ${name}. Photorealistic, professional photography, sharp focus, well-lit, detailed, 8k resolution. The subject "${name}" should be clearly recognizable and the main focus of the image.`;
     
-    const negative_prompt = "blurry, low quality, distorted, watermark, text, logo, signature, abstract, artistic, painting, sketch";
+    const negative_prompt = "blurry, low quality, distorted, watermark, text, logo, signature, abstract, cartoon, anime, drawing, painting, sketch, disfigured, bad anatomy, wrong proportions";
 
     const output = await replicate.run(
       "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
@@ -45,7 +46,7 @@ export const generateImageWithStableDiffusion = async (name: string, topic: stri
 // Alternative: Faster model for even cheaper generation
 export const generateImageWithStableDiffusionTurbo = async (name: string, topic: string): Promise<string> => {
   try {
-    const prompt = `${name}, product photo, clean background, ${topic}, realistic, high quality`;
+    const prompt = `A high-quality photograph of ${name}, photorealistic, professional photography, sharp focus, well-lit, the subject "${name}" is clearly recognizable`;
 
     const output = await replicate.run(
       "stability-ai/sdxl-turbo:da77bc59ee60423279fd632efb4795ab731d9e3ca9705ef3341091fb989b7eaf",
