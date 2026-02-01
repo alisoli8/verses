@@ -47,9 +47,10 @@ class OpenverseService {
   private tokenExpiry: number = 0;
 
   constructor() {
-    // Get API credentials from environment variables
-    this.clientId = (import.meta as any).env?.VITE_OPENVERSE_CLIENT_ID || '';
-    this.clientSecret = (import.meta as any).env?.VITE_OPENVERSE_CLIENT_SECRET || '';
+    // Get API credentials from environment variables (window.process.env from env.js)
+    const env = (window as any).process?.env || {};
+    this.clientId = env.VITE_OPENVERSE_CLIENT_ID || '';
+    this.clientSecret = env.VITE_OPENVERSE_CLIENT_SECRET || '';
     
     if (!this.clientId || !this.clientSecret) {
       console.warn('Openverse API credentials not found. Image search will not work.');
@@ -117,15 +118,12 @@ class OpenverseService {
     try {
       const token = await this.getAccessToken();
       
+      // Keep params minimal to match Openverse website behavior
       const params = new URLSearchParams({
         q: query.trim(),
         page: page.toString(),
-        page_size: Math.min(pageSize, 500).toString(), // Openverse max is 500
-        license: 'cc0,pdm,by,by-sa,by-nc,by-nd,by-nc-sa,by-nc-nd', // All Creative Commons licenses
-        category: 'photograph', // Focus on photos
-        extension: 'jpg,jpeg,png,webp', // Common web formats
+        page_size: Math.min(pageSize, 500).toString(),
         mature: 'false', // Filter out mature content
-        qa: 'false', // Exclude quality assurance flagged content
       });
 
       const response = await fetch(`${this.endpoint}?${params}`, {

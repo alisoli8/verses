@@ -19,8 +19,13 @@ window.process = {
     // These will be used when implementing real auth
     AUTH_REDIRECT_URL: 'http://localhost:5173/auth/callback',
 
+    VITE_SERPER_API_KEY: '0985a7284c781e80dc1b51a9ec85c2019af7add2',
+    VITE_POLLINATIONS_API_KEY: 'sk_W81nWMdazKEnnH8mwy9DQtiNGiYrPY5G',
     VITE_OPENVERSE_CLIENT_ID: 'FtzCY2OWaceV5jjTHsy9hnJVGZq5ryUldHkZCD22',
-    VITE_OPENVERSE_CLIENT_SECRET: 'wJRXqAwZd9WzuTWjOl7UULeDSGjPMjE2mi2XSVaadqKhiEK6RtVb2o44ko3fjIxoLPUHDXRhmZlmOMwshHCGbDBRQvjBoe5w66tDdscLrbkyRb18hBqoPYnOuGehl2l5'
+    VITE_OPENVERSE_CLIENT_SECRET: 'wJRXqAwZd9WzuTWjOl7UULeDSGjPMjE2mi2XSVaadqKhiEK6RtVb2o44ko3fjIxoLPUHDXRhmZlmOMwshHCGbDBRQvjBoe5w66tDdscLrbkyRb18hBqoPYnOuGehl2l5',
+
+    // --- Pollinations AI Image Generation ---
+    VITE_POLLINATIONS_API_KEY: 'sk_W81nWMdazKEnnH8mwy9DQtiNGiYrPY5G',
     
     // --- Optional: Firebase Alternative ---
     // Uncomment if you choose Firebase instead of Supabase
