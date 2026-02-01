@@ -1,13 +1,11 @@
 // Serper API Service - Google Image Search
 // https://serper.dev/ - Fast and affordable Google Search API
+// Now proxied through /api/serper to keep API keys secure
 
 // ============================================
 // TOGGLE: Set to false to disable Serper
 // ============================================
 const SERPER_ENABLED = false;
-
-// Get API key from window.process.env (set by env.js)
-const getApiKey = () => (window as any).process?.env?.VITE_SERPER_API_KEY || '';
 
 export interface SerperImageResult {
   title: string;
@@ -32,48 +30,34 @@ interface SerperImageResponse {
   };
 }
 
-// API_KEY is now retrieved via getApiKey() function above
-
 class SerperService {
-  private readonly endpoint = 'https://google.serper.dev/images';
-
   /**
-   * Search for images using Serper (Google Images)
+   * Search for images using Serper (Google Images) via API proxy
    * @param query - Search term (e.g., "mountain", "BMW", "LeBron James")
    * @param num - Number of images to return (default 20)
    * @returns Promise with image search results
    */
   async searchImages(query: string, num: number = 20): Promise<SerperImageResult[]> {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      throw new Error('Serper API key is required');
-    }
-
     if (!query.trim()) {
       return [];
     }
 
     try {
-      const response = await fetch(this.endpoint, {
+      // Call our API proxy instead of Serper directly
+      const response = await fetch('/api/serper', {
         method: 'POST',
         headers: {
-          'X-API-KEY': apiKey,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          q: query.trim(),
+          query: query.trim(),
           num: num,
         }),
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Invalid Serper API key. Please check your API key.');
-        } else if (response.status === 429) {
-          throw new Error('Serper API rate limit exceeded. Please try again later.');
-        } else {
-          throw new Error(`Serper API error: ${response.status} ${response.statusText}`);
-        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `API error: ${response.status}`);
       }
 
       const data: SerperImageResponse = await response.json();
@@ -91,20 +75,18 @@ class SerperService {
   }
 
   /**
-   * Check if the service is properly configured AND enabled
+   * Check if the service is enabled
    */
   isConfigured(): boolean {
-    return SERPER_ENABLED && !!getApiKey();
+    return SERPER_ENABLED;
   }
 
   /**
-   * Get API key status info
+   * Get service status
    */
   getStatus() {
-    const apiKey = getApiKey();
     return {
-      hasKey: !!apiKey,
-      keyConfigured: apiKey.length > 0
+      enabled: SERPER_ENABLED
     };
   }
 }

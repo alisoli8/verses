@@ -1,15 +1,22 @@
 import { createClient, SupabaseClient, AuthError, PostgrestError } from '@supabase/supabase-js';
 import type { VsPost, User, Comment, VsOption } from '../types';
 
+// Get env var - try Vite env first, then window.process.env
+const getEnvVar = (key: string): string => {
+  const viteEnv = (import.meta as any).env || {};
+  const windowEnv = (window as any).process?.env || {};
+  return viteEnv[key] || windowEnv[key] || '';
+};
+
 // Initialize Supabase client
-const supabaseUrl = (window as any).process?.env?.SUPABASE_URL || '';
-const supabaseAnonKey = (window as any).process?.env?.SUPABASE_ANON_KEY || '';
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL');
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('⚠️ Supabase credentials not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to env.js');
+  console.warn('⚠️ Supabase credentials not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to environment variables.');
 }
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase: SupabaseClient = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder');
 
 // ============================================
 // TYPE DEFINITIONS

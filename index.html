@@ -61,7 +61,11 @@
   }
 }
 </script>
-<script src="env.js"></script>
+<script>
+  // Initialize process.env for local development (env.js) or empty for production
+  window.process = window.process || { env: {} };
+</script>
+<script src="env.js" onerror="console.log('env.js not found - using Vite environment variables')"></script>
 <link rel="stylesheet" href="/styles/globals.css">
 <link rel="stylesheet" href="/index.css">
 </head>

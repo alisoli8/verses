@@ -40,67 +40,8 @@ interface OpenverseSearchResponse {
 }
 
 class OpenverseService {
-  private readonly endpoint = 'https://api.openverse.org/v1/images/';
-  private readonly clientId: string;
-  private readonly clientSecret: string;
-  private accessToken: string | null = null;
-  private tokenExpiry: number = 0;
-
-  constructor() {
-    // Get API credentials from environment variables (window.process.env from env.js)
-    const env = (window as any).process?.env || {};
-    this.clientId = env.VITE_OPENVERSE_CLIENT_ID || '';
-    this.clientSecret = env.VITE_OPENVERSE_CLIENT_SECRET || '';
-    
-    if (!this.clientId || !this.clientSecret) {
-      console.warn('Openverse API credentials not found. Image search will not work.');
-    }
-  }
-
   /**
-   * Get or refresh access token
-   */
-  private async getAccessToken(): Promise<string> {
-    // Check if we have a valid token
-    if (this.accessToken && Date.now() < this.tokenExpiry) {
-      return this.accessToken;
-    }
-
-    if (!this.clientId || !this.clientSecret) {
-      throw new Error('Openverse API credentials are required');
-    }
-
-    try {
-      const response = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-          grant_type: 'client_credentials',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Token request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      this.accessToken = data.access_token;
-      // Set expiry to 90% of actual expiry to refresh early
-      this.tokenExpiry = Date.now() + (data.expires_in * 900);
-      
-      return this.accessToken;
-    } catch (error) {
-      console.error('Failed to get Openverse access token:', error);
-      throw new Error('Failed to authenticate with Openverse API');
-    }
-  }
-
-  /**
-   * Search for images using Openverse API
+   * Search for images using Openverse API via proxy
    * @param query - Search term (e.g., "kobe", "pizza vs burger")
    * @param page - Page number (1-based)
    * @param pageSize - Number of images per page (max 500)
@@ -116,35 +57,22 @@ class OpenverseService {
     }
 
     try {
-      const token = await this.getAccessToken();
-      
-      // Keep params minimal to match Openverse website behavior
-      const params = new URLSearchParams({
-        q: query.trim(),
-        page: page.toString(),
-        page_size: Math.min(pageSize, 500).toString(),
-        mature: 'false', // Filter out mature content
-      });
-
-      const response = await fetch(`${this.endpoint}?${params}`, {
-        method: 'GET',
+      // Call our API proxy instead of Openverse directly
+      const response = await fetch('/api/openverse', {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          query: query.trim(),
+          page,
+          pageSize,
+        }),
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          // Token might be expired, clear it and retry once
-          this.accessToken = null;
-          this.tokenExpiry = 0;
-          throw new Error('Authentication failed. Please check your Openverse credentials.');
-        } else if (response.status === 429) {
-          throw new Error('Rate limit exceeded. Please try again later.');
-        } else {
-          throw new Error(`Openverse API error: ${response.status} ${response.statusText}`);
-        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `API error: ${response.status}`);
       }
 
       const data: OpenverseSearchResponse = await response.json();
@@ -162,30 +90,11 @@ class OpenverseService {
   }
 
   /**
-   * Get image details by ID
-   * @param imageId - The Openverse image ID
+   * Get image details by ID - not available via proxy
    */
   async getImageDetails(imageId: string): Promise<OpenverseImageResult | null> {
-    try {
-      const token = await this.getAccessToken();
-      
-      const response = await fetch(`${this.endpoint}${imageId}/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Failed to get image details:', error);
-      return null;
-    }
+    // Not implemented for proxy version
+    return null;
   }
 
   /**
@@ -212,19 +121,19 @@ class OpenverseService {
   }
 
   /**
-   * Check if the service is properly configured
+   * Check if the service is enabled (always true when using proxy)
    */
   isConfigured(): boolean {
-    return !!(this.clientId && this.clientSecret);
+    return true;
   }
 
   /**
-   * Get usage info for the API credentials
+   * Get usage info
    */
   getUsageInfo(): { hasCredentials: boolean; credentialsConfigured: boolean } {
     return {
-      hasCredentials: !!(this.clientId && this.clientSecret),
-      credentialsConfigured: this.clientId.length > 0 && this.clientSecret.length > 0
+      hasCredentials: true,
+      credentialsConfigured: true
     };
   }
 }
