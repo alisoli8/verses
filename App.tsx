@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import FeedView from './components/FeedView';
 import CreateView from './components/CreateView';
 import VotingView from './components/VotingView';
@@ -11,11 +11,12 @@ import BottomNavBar from './components/BottomNavBar';
 import AuthView from './components/auth/AuthView';
 import { View } from './types';
 import type { VsPost, User, Comment, VsOption } from './types';
-import { INITIAL_POSTS, MOCK_USERS } from './constants';
 import { generateNewVsPost, generateImage } from './services/geminiService';
 import { RiShare2Line, RiLink } from 'react-icons/ri';
 import CommentSheet from './components/common/CommentSheet';
 import UserListSheet from './components/common/UserListSheet';
+import supabaseService from './services/supabaseService';
+import { toast } from './contexts/ToastContext';
 
 
 const AppShareModal: React.FC<{ post: VsPost, onClose: () => void }> = ({ post, onClose }) => {
@@ -30,7 +31,7 @@ const AppShareModal: React.FC<{ post: VsPost, onClose: () => void }> = ({ post, 
       try {
         await navigator.share({
           title: `Vote now: ${post.title}`,
-          text: `Who will win? Cast your vote for "${post.title}" on AI VS Arena!`,
+          text: `Who will win? Cast your vote for "${post.title}" on Verses!`,
           url: window.location.href,
         });
         onClose();
@@ -38,7 +39,7 @@ const AppShareModal: React.FC<{ post: VsPost, onClose: () => void }> = ({ post, 
         console.error('Error sharing:', error);
       }
     } else {
-      alert('Web Share API is not supported in your browser.');
+      toast.warning('Web Share API is not supported in your browser.');
     }
   };
 
@@ -70,16 +71,18 @@ const AppShareModal: React.FC<{ post: VsPost, onClose: () => void }> = ({ post, 
 
 
 const App: React.FC = () => {
-  const [posts, setPosts] = useState<VsPost[]>(INITIAL_POSTS);
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(() => localStorage.getItem('currentUserId'));
-  const currentUser = useMemo(() => users.find(u => u.id === currentUserId), [users, currentUserId]);
+  const [posts, setPosts] = useState<VsPost[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
   const [currentView, setCurrentView] = useState<View>(View.FEED);
   const [previousView, setPreviousView] = useState<View>(View.FEED);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [sharePost, setSharePost] = useState<VsPost | null>(null);
+  const [editingPost, setEditingPost] = useState<VsPost | null>(null);
   
   const [userListSheetState, setUserListSheetState] = useState<{
     isOpen: boolean;
@@ -91,6 +94,9 @@ const App: React.FC = () => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
 
+  // Prevent duplicate auth initialization during HMR hot reloads
+  const authInitializedRef = useRef(false);
+
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -100,41 +106,143 @@ const App: React.FC = () => {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    // Skip if already initialized (prevents HMR duplicate calls)
+    if (authInitializedRef.current) {
+      console.log('⏭️ Auth already initialized, skipping...');
+      return;
+    }
+    
+    authInitializedRef.current = true;
+    
+    const initializeAuth = async () => {
+      console.log('🔵 Initializing auth...');
+      
+      try {
+        const session = await supabaseService.auth.getSession();
+        console.log('Session:', session?.user ? 'User logged in' : 'No user');
+        
+        if (session?.user) {
+          console.log('🔵 Fetching profile for user:', session.user.id);
+          const profile = await supabaseService.profiles.getProfile(session.user.id);
+          
+          if (profile) {
+            console.log('✅ Profile found:', profile.name);
+            setCurrentUser(profile);
+          } else {
+            console.warn('⚠️ Auth user exists but no profile found. Logging out...');
+            await supabaseService.auth.signOut();
+          }
+        }
+      } catch (error) {
+        console.error('🔴 Auth initialization error:', error);
+        await supabaseService.auth.signOut();
+      } finally {
+        console.log('✅ Auth check complete');
+        setAuthChecked(true);
+      }
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabaseService.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔵 Auth state changed:', event);
+      
+      // Only handle LOGIN and SIGNOUT events
+      // SIGNUP is handled directly in handleSignup
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Get current user from state to avoid stale closure
+        setCurrentUser(prev => {
+          // If user already loaded from signup, skip
+          if (prev?.id === session.user.id) {
+            console.log('ℹ️ User already loaded from signup, skipping fetch');
+            return prev;
+          }
+          
+          // Otherwise fetch profile for login
+          console.log('🔵 User signed in via login, fetching profile...');
+          supabaseService.profiles.getProfile(session.user.id).then(profile => {
+            if (profile) {
+              console.log('✅ Profile loaded:', profile.name);
+              setCurrentUser(profile);
+            } else {
+              console.warn('⚠️ No profile found after signin');
+              supabaseService.auth.signOut();
+            }
+          });
+          
+          return prev; // Keep previous user while loading
+        });
+      } else if (event === 'SIGNED_OUT') {
+        console.log('👋 User signed out');
+        setCurrentUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!authChecked) return;
+      
+      try {
+        setLoading(true);
+        const [postsData, usersData] = await Promise.all([
+          supabaseService.posts.getAllPosts(),
+          supabaseService.profiles.getAllProfiles(),
+        ]);
+        setPosts(postsData);
+        setUsers(usersData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [authChecked]);
+
   const handleToggleTheme = () => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   };
   
-  const handleLogin = useCallback((email: string) => {
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase()) || MOCK_USERS.find(u => u.id === 'user-123');
-    if (user) {
-      localStorage.setItem('currentUserId', user.id);
-      setCurrentUserId(user.id);
-    } else {
-      alert("Login failed: User not found.");
+  const handleLogin = useCallback(async (email: string, password: string = 'password123') => {
+    try {
+      await supabaseService.auth.signIn(email, password);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(`Login failed: ${error.message}`);
     }
-  }, [users]);
+  }, []);
   
-  const handleSignup = useCallback((name: string, email: string) => {
-    const newUser: User = {
-      id: `user-${new Date().getTime()}`,
-      name,
-      email,
-      profileImageUrl: `https://i.pravatar.cc/150?u=${name}`,
-      bio: 'New user ready for battle!',
-      avatarInitial: name.charAt(0).toUpperCase(),
-      savedPostIds: new Set(),
-      following: new Set(),
-      followers: new Set(),
-    };
-    setUsers(prev => [...prev, newUser]);
-    localStorage.setItem('currentUserId', newUser.id);
-    setCurrentUserId(newUser.id);
+  const handleSignup = useCallback(async (name: string, email: string, password: string = 'password123') => {
+    console.log('🔵 Signup initiated for:', email);
+    try {
+      // signUp now waits for complete profile creation
+      const { profile } = await supabaseService.auth.signUp(email, password, name);
+      console.log('✅ Signup completed successfully, profile ready');
+      
+      // Directly set the user - profile is already fully loaded
+      setCurrentUser(profile);
+      
+      // Auth is now complete, fetch data will run automatically
+    } catch (error: any) {
+      console.error('🔴 Signup error:', error);
+      toast.error(`Signup failed: ${error.message || 'Unknown error'}`);
+    }
   }, []);
 
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem('currentUserId');
-    setCurrentUserId(null);
-    setCurrentView(View.FEED);
+  const handleLogout = useCallback(async () => {
+    try {
+      await supabaseService.auth.signOut();
+      setCurrentView(View.FEED);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   }, []);
 
 
@@ -180,34 +288,43 @@ const App: React.FC = () => {
   
   const handleBackFromSettings = () => setCurrentView(View.PROFILE);
 
-  const handleClassicVote = useCallback((postId: string, option: 'A' | 'B') => {
-    setPosts(prevPosts =>
-      prevPosts.map(p => {
-        if (p.id === postId && p.userVote === null) {
-          const newPost = { ...p, userVote: option };
-          if (option === 'A' && newPost.optionA) {
-            newPost.optionA = { ...newPost.optionA, votes: newPost.optionA.votes + 1 };
-          } else if (newPost.optionB) {
-            newPost.optionB = { ...newPost.optionB, votes: newPost.optionB.votes + 1 };
-          }
-          return newPost;
-        }
-        return p;
-      })
-    );
-  }, []);
-
-  const handleToggleSave = useCallback((postId: string) => {
-    setUsers(prevUsers => prevUsers.map(user => {
-      if (user.id === currentUserId) {
-        const newSavedPostIds = new Set(user.savedPostIds);
-        if (newSavedPostIds.has(postId)) { newSavedPostIds.delete(postId); } 
-        else { newSavedPostIds.add(postId); }
-        return { ...user, savedPostIds: newSavedPostIds };
+  const handleClassicVote = useCallback(async (postId: string, option: 'A' | 'B') => {
+    if (!currentUser) return;
+    
+    try {
+      await supabaseService.votes.vote(currentUser.id, postId, option);
+      
+      const updatedPost = await supabaseService.posts.getPost(postId);
+      if (updatedPost) {
+        setPosts(prevPosts => prevPosts.map(p => p.id === postId ? updatedPost : p));
       }
-      return user;
-    }));
-  }, [currentUserId]);
+    } catch (error) {
+      console.error('Vote error:', error);
+    }
+  }, [currentUser]);
+
+  const handleToggleSave = useCallback(async (postId: string) => {
+    if (!currentUser) return;
+    
+    try {
+      const isSaved = currentUser.savedPostIds.has(postId);
+      
+      // Optimistically update local state immediately
+      const updatedSavedPostIds = new Set(currentUser.savedPostIds);
+      if (isSaved) {
+        updatedSavedPostIds.delete(postId);
+        await supabaseService.savedPosts.unsavePost(currentUser.id, postId);
+      } else {
+        updatedSavedPostIds.add(postId);
+        await supabaseService.savedPosts.savePost(currentUser.id, postId);
+      }
+      
+      // Update only the savedPostIds field without refetching entire profile
+      setCurrentUser(prev => prev ? { ...prev, savedPostIds: updatedSavedPostIds } : null);
+    } catch (error) {
+      console.error('Toggle save error:', error);
+    }
+  }, [currentUser]);
 
   const handleSharePost = useCallback((postId: string) => {
     const postToShare = posts.find(p => p.id === postId);
@@ -220,85 +337,77 @@ const App: React.FC = () => {
     setSharePost(null);
   }
 
-  const handleAddComment = useCallback((postId: string, text: string, parentId?: string) => {
+  const handleAddComment = useCallback(async (postId: string, text: string, parentId?: string) => {
     if (!currentUser) return;
-    const newComment: Comment = {
-      id: `c-${new Date().getTime()}`,
-      author: { name: currentUser.name, profileImageUrl: currentUser.profileImageUrl },
-      text: text,
-      likes: new Set(),
-      replies: [],
-      parentId: parentId || undefined,
-    };
-
-    setPosts(prevPosts =>
-      prevPosts.map(p => {
-        if (p.id !== postId) return p;
-
-        if (!parentId) {
-          return { ...p, comments: [newComment, ...p.comments] };
-        }
-
-        const addReplyRecursively = (comments: Comment[]): Comment[] => {
-          return comments.map(comment => {
-            if (comment.id === parentId) {
-              return { ...comment, replies: [newComment, ...(comment.replies || [])] };
-            }
-            if (comment.replies && comment.replies.length > 0) {
-              return { ...comment, replies: addReplyRecursively(comment.replies) };
-            }
-            return comment;
-          });
-        };
-        return { ...p, comments: addReplyRecursively(p.comments) };
-      })
-    );
+    
+    try {
+      await supabaseService.comments.addComment(postId, currentUser.id, text, parentId);
+      
+      const updatedPost = await supabaseService.posts.getPost(postId);
+      if (updatedPost) {
+        setPosts(prevPosts => prevPosts.map(p => p.id === postId ? updatedPost : p));
+      }
+    } catch (error) {
+      console.error('Add comment error:', error);
+    }
   }, [currentUser]);
   
-  const handleToggleCommentLike = useCallback((postId: string, commentId: string) => {
+  const handleToggleCommentLike = useCallback(async (postId: string, commentId: string) => {
     if (!currentUser) return;
-
-    const toggleLikeRecursively = (comments: Comment[]): Comment[] => {
-        return comments.map(comment => {
-            if (comment.id === commentId) {
-                const newLikes = new Set(comment.likes);
-                if (newLikes.has(currentUser.id)) {
-                    newLikes.delete(currentUser.id);
-                } else {
-                    newLikes.add(currentUser.id);
-                }
-                return { ...comment, likes: newLikes };
-            }
-            if (comment.replies && comment.replies.length > 0) {
-                return { ...comment, replies: toggleLikeRecursively(comment.replies) };
-            }
-            return comment;
-        });
-    };
-
-    setPosts(prevPosts =>
-        prevPosts.map(p => {
-            if (p.id !== postId) return p;
-            return { ...p, comments: toggleLikeRecursively(p.comments) };
-        })
-    );
-  }, [currentUser]);
+    
+    try {
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+      
+      const findComment = (comments: Comment[]): Comment | null => {
+        for (const comment of comments) {
+          if (comment.id === commentId) return comment;
+          const found = findComment(comment.replies);
+          if (found) return found;
+        }
+        return null;
+      };
+      
+      const comment = findComment(post.comments);
+      if (!comment) return;
+      
+      const isLiked = comment.likes.has(currentUser.id);
+      
+      if (isLiked) {
+        await supabaseService.comments.unlikeComment(currentUser.id, commentId);
+      } else {
+        await supabaseService.comments.likeComment(currentUser.id, commentId);
+      }
+      
+      const updatedPost = await supabaseService.posts.getPost(postId);
+      if (updatedPost) {
+        setPosts(prevPosts => prevPosts.map(p => p.id === postId ? updatedPost : p));
+      }
+    } catch (error) {
+      console.error('Toggle comment like error:', error);
+    }
+  }, [currentUser, posts]);
 
   const handleCreateAIPost = useCallback(async (topic: string) => {
     if (!currentUser) return;
     try {
         const newPostData = await generateNewVsPost(topic);
-        const newPost: VsPost = {
-            ...newPostData,
-            id: new Date().getTime().toString(),
+        
+        const createdPost = await supabaseService.posts.createPost(currentUser.id, {
             type: 'classic',
-            userVote: null,
-            author: { id: currentUser.id, name: currentUser.name, profileImageUrl: currentUser.profileImageUrl },
-            comments: [],
+            title: newPostData.title,
+            topic: topic,
+            option_a_name: newPostData.optionA!.name,
+            option_a_image: newPostData.optionA!.imageUrl,
+            option_a_votes: 0,
+            option_b_name: newPostData.optionB!.name,
+            option_b_image: newPostData.optionB!.imageUrl,
+            option_b_votes: 0,
             likes: 0,
             shares: 0,
-        };
-        setPosts(prevPosts => [newPost, ...prevPosts]);
+        });
+        
+        setPosts(prevPosts => [createdPost, ...prevPosts]);
         setCurrentView(View.FEED);
     } catch (error) {
         console.error("Failed to create post:", error);
@@ -306,20 +415,70 @@ const App: React.FC = () => {
     }
   }, [currentUser]);
   
-  const handleCreateClassicPost = useCallback((postData: Omit<VsPost, 'id' | 'userVote' | 'author' | 'comments' | 'topic' | 'type'>) => {
-     if (!currentUser) return;
-     const newPost: VsPost = {
-        ...postData,
-        id: new Date().getTime().toString(),
-        type: 'classic',
-        topic: 'Custom',
-        userVote: null,
-        author: { id: currentUser.id, name: currentUser.name, profileImageUrl: currentUser.profileImageUrl },
-        comments: [],
-     };
-     setPosts(prevPosts => [newPost, ...prevPosts]);
-     setCurrentView(View.FEED);
-  }, [currentUser]);
+  const handleCreateClassicPost = useCallback(async (postData: Omit<VsPost, 'id' | 'userVote' | 'author' | 'comments' | 'topic' | 'type'>) => {
+     if (!currentUser || !postData.optionA || !postData.optionB) return;
+     
+     try {
+       // Check if we're editing an existing post
+       if (editingPost) {
+         // Update existing post
+         await supabaseService.posts.updatePost(editingPost.id, {
+           title: postData.title,
+           option_a_name: postData.optionA.name,
+           option_a_image: postData.optionA.imageUrl,
+           option_a_background_color: postData.optionA.backgroundColor,
+           option_a_transform: postData.optionA.imageTransform,
+           option_b_name: postData.optionB.name,
+           option_b_image: postData.optionB.imageUrl,
+           option_b_background_color: postData.optionB.backgroundColor,
+           option_b_transform: postData.optionB.imageTransform,
+           aspect_ratio: postData.aspectRatio,
+         });
+         
+         // Update local state
+         setPosts(prevPosts => prevPosts.map(p => 
+           p.id === editingPost.id 
+             ? { 
+                 ...p, 
+                 title: postData.title,
+                 aspectRatio: postData.aspectRatio,
+                 optionA: postData.optionA,
+                 optionB: postData.optionB
+               }
+             : p
+         ));
+         setEditingPost(null);
+         toast.success('Post updated successfully!');
+       } else {
+         // Create new post
+         const createdPost = await supabaseService.posts.createPost(currentUser.id, {
+           type: 'classic',
+           title: postData.title,
+           topic: 'Custom',
+           option_a_name: postData.optionA.name,
+           option_a_image: postData.optionA.imageUrl,
+           option_a_votes: 0,
+           option_a_background_color: postData.optionA.backgroundColor,
+           option_a_transform: postData.optionA.imageTransform,
+           option_b_name: postData.optionB.name,
+           option_b_image: postData.optionB.imageUrl,
+           option_b_votes: 0,
+           option_b_background_color: postData.optionB.backgroundColor,
+           option_b_transform: postData.optionB.imageTransform,
+           likes: postData.likes || 0,
+           shares: postData.shares || 0,
+           aspect_ratio: postData.aspectRatio,
+         });
+         
+         setPosts(prevPosts => [createdPost, ...prevPosts]);
+       }
+       
+       setCurrentView(View.FEED);
+     } catch (error) {
+       console.error('Create/update post error:', error);
+       toast.error('Failed to save post');
+     }
+  }, [currentUser, editingPost]);
 
   const handleCreateMatchUpPost = useCallback(async (title: string, challengers: string[]) => {
     if (!currentUser) return;
@@ -433,37 +592,103 @@ const App: React.FC = () => {
     }, 1500);
   }, []);
 
-  const handleUpdateUser = useCallback((updatedUser: Partial<User>) => {
-    setUsers(prevUsers => prevUsers.map(u => u.id === currentUserId ? {...u, ...updatedUser} : u));
-    alert("Profile updated successfully!");
-    setCurrentView(View.PROFILE);
-  }, [currentUserId]);
+  const handleUpdateUser = useCallback(async (updatedUser: Partial<User>) => {
+    if (!currentUser) return;
+    
+    try {
+      await supabaseService.profiles.updateProfile(currentUser.id, {
+        name: updatedUser.name,
+        bio: updatedUser.bio,
+        profile_image_url: updatedUser.profileImageUrl,
+        avatar_initial: updatedUser.avatarInitial,
+      });
+      
+      const updatedProfile = await supabaseService.profiles.getProfile(currentUser.id);
+      if (updatedProfile) {
+        setCurrentUser(updatedProfile);
+      }
+      
+      toast.success('Profile updated successfully!');
+      setCurrentView(View.PROFILE);
+    } catch (error) {
+      console.error('Update user error:', error);
+      toast.error('Failed to update profile');
+    }
+  }, [currentUser]);
   
-  const handleFollowToggle = useCallback((targetUserId: string) => {
-    setUsers(prevUsers => {
-      return prevUsers.map(user => {
-        if (user.id === currentUserId) {
-          const newFollowing = new Set(user.following);
-          if (newFollowing.has(targetUserId)) {
-            newFollowing.delete(targetUserId);
-          } else {
-            newFollowing.add(targetUserId);
-          }
-          return { ...user, following: newFollowing };
-        }
+  const handleFollowToggle = useCallback(async (targetUserId: string) => {
+    if (!currentUser) return;
+    
+    try {
+      const isFollowing = currentUser.following.has(targetUserId);
+      
+      // Optimistically update local state immediately
+      const updatedFollowing = new Set(currentUser.following);
+      if (isFollowing) {
+        updatedFollowing.delete(targetUserId);
+        await supabaseService.follows.unfollow(currentUser.id, targetUserId);
+      } else {
+        updatedFollowing.add(targetUserId);
+        await supabaseService.follows.follow(currentUser.id, targetUserId);
+      }
+      
+      // Update only the following field without refetching entire profile
+      setCurrentUser(prev => prev ? { ...prev, following: updatedFollowing } : null);
+      
+      // Update the target user's follower count in the users list
+      setUsers(prevUsers => prevUsers.map(user => {
         if (user.id === targetUserId) {
-          const newFollowers = new Set(user.followers);
-          if (newFollowers.has(currentUserId!)) {
-            newFollowers.delete(currentUserId!);
+          const updatedFollowers = new Set(user.followers);
+          if (isFollowing) {
+            updatedFollowers.delete(currentUser.id);
           } else {
-            newFollowers.add(currentUserId!);
+            updatedFollowers.add(currentUser.id);
           }
-          return { ...user, followers: newFollowers };
+          return { ...user, followers: updatedFollowers };
         }
         return user;
-      });
-    });
-  }, [currentUserId]);
+      }));
+    } catch (error) {
+      console.error('Follow toggle error:', error);
+    }
+  }, [currentUser]);
+
+  const handleEditPost = useCallback((postId: string) => {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    // Check if post has votes
+    const totalVotes = (post.optionA?.votes ?? 0) + (post.optionB?.votes ?? 0);
+    if (totalVotes > 0) {
+      toast.warning('Cannot edit a post that has votes');
+      return;
+    }
+    
+    setEditingPost(post);
+    setCurrentView(View.CREATE);
+  }, [posts]);
+
+  const handleDeletePost = useCallback(async (postId: string) => {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+    
+    try {
+      await supabaseService.posts.deletePost(postId);
+      setPosts(prevPosts => prevPosts.filter(p => p.id !== postId));
+      toast.success('Post deleted successfully!');
+    } catch (error) {
+      console.error('Delete post error:', error);
+      toast.error('Failed to delete post');
+    }
+  }, []);
+
+  const handleReportDuplicate = useCallback((postId: string) => {
+    toast.info(`Reported post as duplicate - This would be sent to moderators in a real implementation`);
+  }, []);
+
+  const handleHidePost = useCallback((postId: string) => {
+    // In a real app, this would hide the post from the user's feed
+    toast.info('Post hidden from your feed');
+  }, []);
 
   const handleShowUserList = useCallback((listType: 'followers' | 'following', userIds: Set<string>) => {
       setUserListSheetState({
@@ -498,6 +723,28 @@ const App: React.FC = () => {
       return [...votedClassic, ...votedMatchUp].sort((a,b) => b.id.localeCompare(a.id));
   }, [posts]);
   
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-brand-screen-color dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-brand-lime"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-brand-screen-color dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-brand-lime"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading posts...</p>
+        </div>
+      </div>
+    );
+  }
+  
   if (!currentUser) {
     return <AuthView onLogin={handleLogin} onSignup={handleSignup} />;
   }
@@ -505,7 +752,17 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case View.CREATE:
-        return <CreateView posts={posts} onBack={() => setCurrentView(View.FEED)} onCreateWithAI={handleCreateAIPost} onCreateClassic={handleCreateClassicPost} onCreateMatchUp={handleCreateMatchUpPost} />;
+        return <CreateView 
+          posts={posts} 
+          editPost={editingPost}
+          onBack={() => {
+            setEditingPost(null);
+            setCurrentView(View.FEED);
+          }} 
+          onCreateWithAI={handleCreateAIPost} 
+          onCreateClassic={handleCreateClassicPost} 
+          onCreateMatchUp={handleCreateMatchUpPost} 
+        />;
       case View.SEARCH:
         return <SearchView
                     posts={posts}
@@ -514,6 +771,10 @@ const App: React.FC = () => {
                     onToggleSave={handleToggleSave}
                     onClassicVote={handleClassicVote}
                     onSharePost={handleSharePost}
+                    onEditPost={handleEditPost}
+                    onDeletePost={handleDeletePost}
+                    onReportDuplicate={handleReportDuplicate}
+                    onHidePost={handleHidePost}
                 />;
       case View.SAVED:
         return <SavedView
@@ -544,15 +805,15 @@ const App: React.FC = () => {
         return <SettingsView user={currentUser} onBack={handleBackFromSettings} onUpdateUser={handleUpdateUser} theme={theme} onToggleTheme={handleToggleTheme} onLogout={handleLogout} />;
       case View.FEED:
       default:
-        return <FeedView user={currentUser} onSelectPost={handleSelectPost} onToggleSave={handleToggleSave} posts={posts} showHighlights={true} emptyStateMessage="Welcome! Create a post to get started." onClassicVote={handleClassicVote} onMatchUpVote={handleMatchUpVote} onSharePost={handleSharePost} onCommentClick={handleOpenComments} onFollow={handleFollowToggle} />;
+        return <FeedView user={currentUser} onSelectPost={handleSelectPost} onToggleSave={handleToggleSave} posts={posts} showHighlights={true} emptyStateMessage="Welcome! Create a post to get started." onClassicVote={handleClassicVote} onMatchUpVote={handleMatchUpVote} onSharePost={handleSharePost} onCommentClick={handleOpenComments} onFollow={handleFollowToggle} onEditPost={handleEditPost} onDeletePost={handleDeletePost} onReportDuplicate={handleReportDuplicate} onHidePost={handleHidePost} />;
     }
   };
 
   const showNavBar = ![View.VOTING, View.CREATE, View.SETTINGS].includes(currentView);
 
   return (
-    <div className="bg-brand-off-white dark:bg-black text-gray-800 dark:text-gray-100 min-h-screen antialiased flex flex-col">
-       <main className={`flex-grow p-1 ${showNavBar ? 'pb-20' : ''}`}>{renderContent()}</main>
+    <div className="bg-[#f1efe9] dark:bg-black text-gray-800 dark:text-gray-100 min-h-screen antialiased flex flex-col">
+       <main className={`flex-grow ${showNavBar ? 'pb-20' : ''}`}>{renderContent()}</main>
        {showNavBar && <BottomNavBar currentView={currentView} onNavigate={handleNavigate} />}
        {sharePost && <AppShareModal post={sharePost} onClose={handleCloseShareModal} />}
        <CommentSheet

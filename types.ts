@@ -3,6 +3,13 @@ export interface VsOption {
   name: string;
   imageUrl: string;
   votes: number;
+  backgroundColor?: string;
+  imageTransform?: {
+    scale: number;
+    translateX: number;
+    translateY: number;
+    objectFit: 'cover' | 'contain' | 'fill' | 'scale-down' | 'none';
+  };
 }
 
 export type Comment = {
@@ -43,6 +50,7 @@ export interface VsPost {
   userVote: 'A' | 'B' | null;
   likes: number;
   shares: number;
+  aspectRatio?: '1/1.2' | '1/1.5';
 
   // For Classic mode, or the current round in Match-up
   optionA?: VsOption;

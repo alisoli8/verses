@@ -5,7 +5,7 @@ import { FcGoogle } from 'react-icons/fc';
 
 interface LoginViewProps {
   onBack: () => void;
-  onLogin: (email: string) => void;
+  onLogin: (email: string, password: string) => void;
   onGoToSignup: () => void;
 }
 
@@ -17,12 +17,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onBack, onLogin, onGoToSignup }) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email && password) {
-      onLogin(email);
+      onLogin(email, password);
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-brand-off-white dark:bg-black text-gray-900 dark:text-gray-100 p-6 flex flex-col">
+    <div className="min-h-screen w-full bg-brand-screen-color dark:bg-black text-gray-900 dark:text-gray-100 p-6 flex flex-col">
       <header className="flex-shrink-0">
         <button onClick={onBack} className="p-2 -ml-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
           <RiArrowLeftLine className="w-6 h-6" />

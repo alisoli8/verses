@@ -6,7 +6,7 @@ import { FcGoogle } from 'react-icons/fc';
 
 interface SignupViewProps {
   onBack: () => void;
-  onSignup: (name: string, email: string) => void;
+  onSignup: (name: string, email: string, password: string) => void;
   onGoToLogin: () => void;
 }
 
@@ -19,12 +19,12 @@ const SignupView: React.FC<SignupViewProps> = ({ onBack, onSignup, onGoToLogin }
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name && email && password) {
-      onSignup(name, email);
+      onSignup(name, email, password);
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-brand-off-white dark:bg-black text-gray-900 dark:text-gray-100 p-6 flex flex-col">
+    <div className="min-h-screen w-full bg-brand-screen-color dark:bg-black text-gray-900 dark:text-gray-100 p-6 flex flex-col">
       <header className="flex-shrink-0">
         <button onClick={onBack} className="p-2 -ml-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
           <RiArrowLeftLine className="w-6 h-6" />
@@ -32,7 +32,7 @@ const SignupView: React.FC<SignupViewProps> = ({ onBack, onSignup, onGoToLogin }
       </header>
       <main className="flex-grow flex flex-col justify-center">
         <div className="w-full max-w-sm mx-auto">
-          <h1 className="text-4xl font-bold text-center mb-8">Join the Arena</h1>
+          <h1 className="text-4xl font-bold text-center mb-8">Join the Verses</h1>
           <form onSubmit={handleSubmit} className="space-y-4">
              <div>
               <label htmlFor="name" className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</label>
