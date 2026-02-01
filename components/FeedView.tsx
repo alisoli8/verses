@@ -140,7 +140,7 @@ const FeedView: React.FC<FeedViewProps> = ({
     <div>
       {showHighlights && (
         <div 
-          className="sticky top-0 bg-brand-off-white/80 rounded-b-2xl dark:bg-black/80 backdrop-blur-lg z-50 py-3 transition-transform duration-300 ease-in-out"
+          className="sticky top-0 bg-brand-screen-color/80 rounded-b-2xl dark:bg-black/80 backdrop-blur-lg z-50 py-3 transition-transform duration-300 ease-in-out"
           style={{ transform: showTabs ? 'translateY(0)' : 'translateY(-100%)' }}
         >
           <div className="max-w-xl mx-auto px-3">

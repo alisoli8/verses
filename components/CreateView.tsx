@@ -10,6 +10,7 @@ import type { VsPost } from '../types';
 import { LuImage } from 'react-icons/lu';
 import { TbPhotoSearch } from 'react-icons/tb';
 import { posts as postsService } from '../services/supabaseService';
+import { toast } from '../contexts/ToastContext';
 
 declare global {
     interface Window {
@@ -106,7 +107,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
             setClassicDetails(prev => ({ ...prev, optionA_name: formattedA, optionB_name: formattedB }));
             setDuplicateError(null);
         } else {
-            alert(`Couldn't understand the format. Please say something like "Coke vs Pepsi".`);
+            toast.warning(`Couldn't understand the format. Please say something like "Coke vs Pepsi".`);
         }
       };
       
@@ -125,7 +126,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
 
   const handleToggleListening = () => {
     if (!recognitionRef.current) {
-        alert("Sorry, your browser doesn't support voice recognition.");
+        toast.warning("Sorry, your browser doesn't support voice recognition.");
         return;
     }
     if (isListening) {
@@ -138,7 +139,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
 
   const startListening = () => {
     if (!recognitionRef.current) {
-        alert("Sorry, your browser doesn't support voice recognition.");
+        toast.warning("Sorry, your browser doesn't support voice recognition.");
         return;
     }
     
@@ -284,7 +285,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
         try {
             await onCreateMatchUp(matchUpDetails.title, challengers);
         } catch (error) {
-            alert("Failed to create match up. Please check console for details.");
+            toast.error('Failed to create match up. Please try again.');
             console.error(error);
         } finally {
             setIsProcessing(false);
@@ -438,7 +439,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
         setImages(prev => ({...prev, [target]: imageUrl }));
     } catch (error) {
         console.error("Image generation failed:", error);
-        alert("Sorry, we couldn't generate the image. Please try again.");
+        toast.error("Sorry, we couldn't generate the image. Please try again.");
     } finally {
         setLoadingImages(prev => ({ ...prev, [target]: false }));
     }
@@ -673,7 +674,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
               <div className="flex flex-col items-center gap-2">
                 <input
                     type="text"
-                    placeholder="Optional title"
+                    placeholder="Add a title"
                     value={matchUpDetails.title}
                     onChange={e => setMatchUpDetails(prev => ({ ...prev, title: e.target.value }))}
                     className="w-full text-lg bg-transparent border-b border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-gray-900 dark:focus:border-white focus:ring-0 outline-none pb-3 mb-16 transition-colors"
@@ -683,7 +684,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                     placeholder="Enter 4 to 20 names, separated by commas... e.g., Jordan, LeBron, Kobe, Shaq..."
                     value={matchUpDetails.challengers}
                     onChange={e => setMatchUpDetails(prev => ({ ...prev, challengers: e.target.value }))}
-                    className="w-full h-32 text-lg bg-transparent border-2 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-gray-900 dark:focus:border-white focus:ring-0 rounded-lg outline-none p-4 transition-colors resize-none"
+                    className="w-full h-32 text-lg bg-transparent border border-gray-400 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-gray-900 dark:focus:border-white focus:ring-0 rounded-lg outline-none p-4 transition-colors resize-none"
                     rows={4}
                 />
               </div>
@@ -715,7 +716,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
           const rightContestant = challengers[rightIndex] || null;
 
           return (
-            <div className="flex-grow flex flex-col w-full bg-brand-off-white dark:bg-gray-900 px-2">
+            <div className="flex-grow flex flex-col w-full bg-brand-screen-color dark:bg-gray-900 px-2">
                 {/* Card Container */}
                 <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-300 dark:border-gray-700 mb-2">
                     {/* Header with title and aspect ratio controls */}
@@ -877,7 +878,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
         
         // Classic view
         return (
-            <div className="flex-grow flex flex-col w-full bg-brand-off-white dark:bg-gray-900 px-2">
+            <div className="flex-grow flex flex-col w-full bg-brand-screen-color dark:bg-gray-900 px-2">
                 {/* Card Container */}
                 <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-300 dark:border-gray-700">
                     {/* Header with title and aspect ratio controls */}
@@ -1114,7 +1115,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
   }
 
   return (
-     <div className="fixed inset-0 bg-brand-off-white dark:bg-gray-900 z-50 flex flex-col">
+     <div className="fixed inset-0 bg-brand-screen-color dark:bg-gray-900 z-50 flex flex-col">
         <header className="flex items-center justify-between px-6 py-6 flex-shrink-0">
             <button onClick={step === 'type_choice' ? onClose : handleBack} className="text-gray-800 dark:text-gray-200">
                 <RiArrowLeftLine className="w-7 h-7"/>
@@ -1191,7 +1192,7 @@ const CreateView: React.FC<CreateViewProps> = ({ posts, editPost, onBack, onCrea
   }
 
   return (
-    <div className="h-[100vh] flex flex-col bg-brand-off-white dark:bg-gray-900 relative px-6">
+    <div className="h-[100vh] flex flex-col bg-brand-screen-color dark:bg-gray-900 relative px-6">
       <button onClick={onBack} className="absolute top-8 left-6 text-gray-800 dark:text-gray-200 p-0 z-10">
           <RiArrowLeftLine className="w-7 h-7" />
       </button>

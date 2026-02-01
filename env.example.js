@@ -11,13 +11,18 @@ window.process = {
     // Get your Gemini API Key from Google AI Studio: https://aistudio.google.com/app/apikey
     API_KEY: 'YOUR_GEMINI_API_KEY',
 
-    // --- Image Search (Optional) ---
-    // Get your Bing Search API Key from Azure Cognitive Services: https://azure.microsoft.com/en-us/services/cognitive-services/bing-web-search-api/
-    // Free tier: 1,000 searches/month
-    VITE_BING_SEARCH_API_KEY: 'YOUR_BING_SEARCH_API_KEY',
+    // --- AI Image Generation ---
+    // Get your Pollinations API Key from: https://enter.pollinations.ai
+    // Free, open-source AI image generation
+    VITE_POLLINATIONS_API_KEY: 'YOUR_POLLINATIONS_API_KEY',
+
+    // --- Web Image Search ---
+    // Get your Serper API Key from: https://serper.dev/
+    // Google Image Search - 2,500 free searches, then $50/50k searches
+    VITE_SERPER_API_KEY: 'YOUR_SERPER_API_KEY',
 
     // Get your Openverse API credentials from: https://api.openverse.org/v1/#tag/auth/operation/register
-    // Free Creative Commons and public domain images
+    // Free Creative Commons and public domain images (unlimited)
     VITE_OPENVERSE_CLIENT_ID: 'YOUR_OPENVERSE_CLIENT_ID',
     VITE_OPENVERSE_CLIENT_SECRET: 'YOUR_OPENVERSE_CLIENT_SECRET',
 

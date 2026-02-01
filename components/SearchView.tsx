@@ -120,7 +120,7 @@ const SearchView: React.FC<SearchViewProps> = ({ posts, user, onSelectPost, onTo
 
   return (
     <div className="min-h-full flex flex-col">
-        <div className="sticky top-0 bg-brand-off-white/80 dark:bg-black/80 backdrop-blur-lg z-10 p-4 pt-6 border-b border-gray-200 dark:border-gray-800">
+        <div className="sticky top-0 bg-brand-screen-color/80 dark:bg-black/80 backdrop-blur-lg z-10 p-4 pt-6 border-b border-gray-200 dark:border-gray-800">
             <div className="max-w-2xl mx-auto">
                 <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

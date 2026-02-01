@@ -1,9 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { RiCloseLine, RiSearchLine, RiUploadLine, RiSparklingLine, RiGlobalLine, RiCreativeCommonsLine } from 'react-icons/ri';
+import { RiCloseLine, RiSearchLine, RiUploadLine, RiSparklingLine, RiGlobalLine, RiExternalLinkLine } from 'react-icons/ri';
 import { uploadToCloudinary } from '../../services/imageService';
 import { generateImage } from '../../services/geminiService';
-import { bingImageService, BingImageResult } from '../../services/bingImageService';
 import { openverseService, OpenverseImageResult } from '../../services/openverseService';
+import { serperService, SerperImageResult } from '../../services/serperService';
+import { toast } from '../../contexts/ToastContext';
+
+// Combined image result type for web search tab
+interface WebImageResult {
+  id: string;
+  url: string;
+  thumbnailUrl: string;
+  title: string;
+  source: 'serper' | 'openverse';
+  attribution?: string;
+  width?: number;
+  height?: number;
+}
 
 interface ImageSelectionModalProps {
   isOpen: boolean;
@@ -13,7 +26,7 @@ interface ImageSelectionModalProps {
   title?: string;
 }
 
-type TabType = 'ai' | 'bing' | 'openverse';
+type TabType = 'ai' | 'web';
 
 const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
   isOpen,
@@ -25,49 +38,113 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('ai');
   const [query, setQuery] = useState(searchQuery);
   const [loading, setLoading] = useState(false);
-  const [bingImages, setBingImages] = useState<BingImageResult[]>([]);
-  const [openverseImages, setOpenverseImages] = useState<OpenverseImageResult[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [webImages, setWebImages] = useState<WebImageResult[]>([]);
   const [aiImage, setAiImage] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [lastQuery, setLastQuery] = useState('');
 
   useEffect(() => {
     if (isOpen && searchQuery) {
       setQuery(searchQuery);
-      if (activeTab === 'bing') {
-        handleBingSearch();
-      } else if (activeTab === 'openverse') {
-        handleOpenverseSearch();
-      }
+      // Don't auto-search on tab switch - user must click search button
     }
-  }, [isOpen, searchQuery, activeTab]);
+  }, [isOpen, searchQuery]);
 
-  const handleBingSearch = async () => {
+  // Combined web search - fetches from both Serper (Google) and Openverse
+  const handleWebSearch = async (page: number = 1, append: boolean = false) => {
     if (!query.trim()) return;
     
-    setLoading(true);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setWebImages([]);
+    }
+    
     try {
-      const results = await bingImageService.searchImages(query.trim(), 20);
-      setBingImages(results);
+      // Fetch from both sources in parallel
+      const [serperResults, openverseResults] = await Promise.allSettled([
+        serperService.isConfigured() ? serperService.searchImages(query.trim(), 10) : Promise.resolve([]),
+        openverseService.isConfigured() ? openverseService.searchImages(query.trim(), page, 20) : Promise.resolve([])
+      ]);
+
+      const combinedResults: WebImageResult[] = [];
+
+      // Add Serper (Google) results (only on first page)
+      if (!append && serperResults.status === 'fulfilled' && serperResults.value.length > 0) {
+        serperResults.value.forEach((img, idx) => {
+          combinedResults.push({
+            id: `serper-${idx}`,
+            url: img.imageUrl,
+            thumbnailUrl: img.thumbnailUrl,
+            title: img.title,
+            source: 'serper',
+            attribution: img.source,
+            width: img.imageWidth,
+            height: img.imageHeight
+          });
+        });
+      }
+
+      // Add Openverse results
+      let openverseCount = 0;
+      if (openverseResults.status === 'fulfilled' && openverseResults.value.length > 0) {
+        openverseCount = openverseResults.value.length;
+        openverseResults.value.forEach((img) => {
+          combinedResults.push({
+            id: `openverse-${img.id}-${page}`,
+            url: img.url,
+            thumbnailUrl: img.thumbnail || img.url,
+            title: img.title,
+            source: 'openverse',
+            attribution: openverseService.getShortAttribution(img),
+            width: img.width,
+            height: img.height
+          });
+        });
+      }
+
+      // Check if there are more results to load
+      setHasMoreResults(openverseCount >= 20);
+      setCurrentPage(page);
+      setLastQuery(query.trim());
+
+      if (append) {
+        // Append new results to existing ones
+        setWebImages(prev => [...prev, ...combinedResults]);
+      } else {
+        // Interleave results for variety (alternating sources) on first load
+        const interleaved: WebImageResult[] = [];
+        const serperItems = combinedResults.filter(r => r.source === 'serper');
+        const openverseItems = combinedResults.filter(r => r.source === 'openverse');
+        const maxLen = Math.max(serperItems.length, openverseItems.length);
+        
+        for (let i = 0; i < maxLen; i++) {
+          if (serperItems[i]) interleaved.push(serperItems[i]);
+          if (openverseItems[i]) interleaved.push(openverseItems[i]);
+        }
+
+        setWebImages(interleaved);
+      }
+
+      if (combinedResults.length === 0 && !append) {
+        console.warn('No images found from either source');
+      }
     } catch (error) {
-      console.error('Bing image search failed:', error);
-      alert('Image search failed. Please check your API key configuration.');
+      console.error('Web image search failed:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const handleOpenverseSearch = async () => {
-    if (!query.trim()) return;
-    
-    setLoading(true);
-    try {
-      const results = await openverseService.searchImages(query.trim(), 1, 20);
-      setOpenverseImages(results);
-    } catch (error) {
-      console.error('Openverse image search failed:', error);
-      alert('Image search failed. Please check your API credentials configuration.');
-    } finally {
-      setLoading(false);
+  // Load more images
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMoreResults) {
+      handleWebSearch(currentPage + 1, true);
     }
   };
 
@@ -87,7 +164,7 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
 
   const handleFileUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      toast.warning('Please select an image file');
       return;
     }
 
@@ -133,8 +210,7 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
   if (!isOpen) return null;
 
   const handleSearch = () => {
-    if (activeTab === 'bing') handleBingSearch();
-    else if (activeTab === 'openverse') handleOpenverseSearch();
+    if (activeTab === 'web') handleWebSearch();
     else if (activeTab === 'ai') handleAiGeneration();
   };
 
@@ -186,7 +262,7 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
         <div className="flex gap-2">
           <button
             onClick={() => setActiveTab('ai')}
-            className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-full transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
+            className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-2xl transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
               activeTab === 'ai'
                 ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
@@ -196,26 +272,15 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
             AI Generate
           </button>
           <button
-            onClick={() => setActiveTab('bing')}
-            className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-full transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-              activeTab === 'bing'
+            onClick={() => setActiveTab('web')}
+            className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-2xl transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
+              activeTab === 'web'
                 ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
             }`}
           >
             <RiGlobalLine className="w-4 h-4" />
-            Web
-          </button>
-          <button
-            onClick={() => setActiveTab('openverse')}
-            className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-full transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-              activeTab === 'openverse'
-                ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
-                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-            }`}
-          >
-            <RiCreativeCommonsLine className="w-4 h-4" />
-            Openverse
+            Web Search
           </button>
         </div>
       </div>
@@ -255,102 +320,77 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
             </div>
           )}
 
-          {/* Bing Web Images Tab */}
-          {activeTab === 'bing' && (
+          {/* Web Search Tab - Combined Serper (Google) + Openverse */}
+          {activeTab === 'web' && (
             <div>
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   <span className="ml-3 text-gray-600 dark:text-gray-400">Searching web images...</span>
                 </div>
-              ) : bingImages.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {bingImages.map((image, index) => (
-                    <div
-                      key={`${image.contentUrl}-${index}`}
-                      className="relative cursor-pointer group rounded-lg overflow-hidden"
-                      onClick={() => handleImageSelect(image.contentUrl)}
-                    >
-                      <img
-                        src={image.thumbnailUrl}
-                        alt={image.name}
-                        className="w-full h-32 object-cover group-hover:scale-105 transition-transform"
-                        onError={(e) => {
-                          // Fallback to content URL if thumbnail fails
-                          const target = e.target as HTMLImageElement;
-                          if (target.src !== image.contentUrl) {
-                            target.src = image.contentUrl;
-                          }
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <span className="text-white opacity-0 group-hover:opacity-100 font-medium text-sm">Select</span>
+              ) : webImages.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {webImages.map((image) => (
+                      <div
+                        key={image.id}
+                        className="relative cursor-pointer group rounded-lg overflow-hidden"
+                        onClick={() => handleImageSelect(image.url)}
+                      >
+                        <img
+                          src={image.thumbnailUrl}
+                          alt={image.title || 'Web image'}
+                          className="w-full h-32 object-cover group-hover:scale-105 transition-transform"
+                          onError={(e) => {
+                            // Fallback to main URL if thumbnail fails
+                            const target = e.target as HTMLImageElement;
+                            if (target.src !== image.url) {
+                              target.src = image.url;
+                            }
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <span className="text-white opacity-0 group-hover:opacity-100 font-medium text-sm">Select</span>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 truncate flex justify-between">
+                          <span>{image.attribution}</span>
+                          <span className={`px-1 rounded text-[10px] ${image.source === 'serper' ? 'bg-blue-500' : 'bg-green-500'}`}>
+                            {image.source === 'serper' ? 'Google' : 'CC'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 truncate">
-                        {image.width}×{image.height} • {image.encodingFormat?.toUpperCase()}
-                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Load More Button */}
+                  {hasMoreResults && (
+                    <div className="flex justify-center pt-4">
+                      <button
+                        onClick={handleLoadMore}
+                        disabled={loadingMore}
+                        className="px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-medium hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {loadingMore ? (
+                          <span className="flex items-center gap-2">
+                            <span className="w-4 h-4 border-2 border-white dark:border-black border-t-transparent rounded-2xl animate-spin"></span>
+                            Loading...
+                          </span>
+                        ) : (
+                          'Load More Images'
+                        )}
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                   <RiGlobalLine className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Search for web images using the search bar above</p>
-                  {!bingImageService.isConfigured() && (
+                  <p>Search for images from in the web here or from 
+                    <span className="block text-gray-500 dark:text-gray-300 p-2 rounded-2xl border border-gray-400 mt-4"><a href="https://images.google.com/" target="_blank" rel="noopener noreferrer"> Google Images <RiExternalLinkLine className="inline" /></a></span> 
+                  </p>
+                  {!serperService.isConfigured() && !openverseService.isConfigured() && (
                     <p className="text-red-500 text-sm mt-2">
-                      ⚠️ Bing API key not configured. Please add VITE_BING_SEARCH_API_KEY to your environment.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Openverse Tab */}
-          {activeTab === 'openverse' && (
-            <div>
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <span className="ml-3 text-gray-600 dark:text-gray-400">Searching Creative Commons images...</span>
-                </div>
-              ) : openverseImages.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {openverseImages.map((image) => (
-                    <div
-                      key={image.id}
-                      className="relative cursor-pointer group rounded-lg overflow-hidden"
-                      onClick={() => handleImageSelect(image.url)}
-                    >
-                      <img
-                        src={image.thumbnail || image.url}
-                        alt={image.title || 'Openverse image'}
-                        className="w-full h-32 object-cover group-hover:scale-105 transition-transform"
-                        onError={(e) => {
-                          // Fallback to main URL if thumbnail fails
-                          const target = e.target as HTMLImageElement;
-                          if (target.src !== image.url) {
-                            target.src = image.url;
-                          }
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <span className="text-white opacity-0 group-hover:opacity-100 font-medium text-sm">Select</span>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 truncate">
-                        {openverseService.getShortAttribution(image)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                  <RiCreativeCommonsLine className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Search for Creative Commons images using the search bar above</p>
-                  <p className="text-sm mt-2 text-gray-400">All images are free to use with proper attribution</p>
-                  {!openverseService.isConfigured() && (
-                    <p className="text-red-500 text-sm mt-2">
-                      ⚠️ Openverse API credentials not configured. Please add VITE_OPENVERSE_CLIENT_ID and VITE_OPENVERSE_CLIENT_SECRET to your environment.
+                      ⚠️ No image search APIs configured. Please add VITE_SERPER_API_KEY or Openverse credentials.
                     </p>
                   )}
                 </div>
@@ -391,7 +431,7 @@ const ImageSelectionModal: React.FC<ImageSelectionModalProps> = ({
                   />
                   <label
                     htmlFor="file-upload"
-                    className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium cursor-pointer transition-colors"
+                    className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-medium cursor-pointer transition-colors"
                   >
                     Choose File
                   </label>

@@ -61,14 +61,14 @@ const generateVsText = async (topic: string): Promise<{ title: string; optionA_n
 };
 
 export const generateImage = async (name: string, topic: string): Promise<string> => {
-    // Use Stable Diffusion for cost-effective image generation
+    // Use Pollinations AI for free, high-quality image generation
     try {
-        const { generateImageWithStableDiffusion } = await import('./replicateService');
-        return await generateImageWithStableDiffusion(name, topic);
-    } catch (stableDiffusionError) {
-        console.warn('Stable Diffusion generation failed, falling back to Gemini:', stableDiffusionError);
+        const { generateImageWithPollinations } = await import('./pollinationsService');
+        return await generateImageWithPollinations(name);
+    } catch (pollinationsError) {
+        console.warn('Pollinations generation failed, falling back to Gemini:', pollinationsError);
         
-        // Fallback to Gemini if Stable Diffusion fails
+        // Fallback to Gemini if Pollinations fails
         try {
             const prompt = `For a competition about '${topic}', generate an iconic, high-quality, cinematic image that is a powerful visual representation of '${name}'. The image must be directly related to '${name}' and avoid generic scenery. For example, if the name is 'The Matrix', the image should feature elements like green code, Neo, or Trinity, not a random forest. The style should be dramatic and visually appealing. Vertical 3:4 aspect ratio.`;
             

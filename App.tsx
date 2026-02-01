@@ -16,6 +16,7 @@ import { RiShare2Line, RiLink } from 'react-icons/ri';
 import CommentSheet from './components/common/CommentSheet';
 import UserListSheet from './components/common/UserListSheet';
 import supabaseService from './services/supabaseService';
+import { toast } from './contexts/ToastContext';
 
 
 const AppShareModal: React.FC<{ post: VsPost, onClose: () => void }> = ({ post, onClose }) => {
@@ -38,7 +39,7 @@ const AppShareModal: React.FC<{ post: VsPost, onClose: () => void }> = ({ post, 
         console.error('Error sharing:', error);
       }
     } else {
-      alert('Web Share API is not supported in your browser.');
+      toast.warning('Web Share API is not supported in your browser.');
     }
   };
 
@@ -214,7 +215,7 @@ const App: React.FC = () => {
       await supabaseService.auth.signIn(email, password);
     } catch (error: any) {
       console.error('Login error:', error);
-      alert(`Login failed: ${error.message}`);
+      toast.error(`Login failed: ${error.message}`);
     }
   }, []);
   
@@ -231,7 +232,7 @@ const App: React.FC = () => {
       // Auth is now complete, fetch data will run automatically
     } catch (error: any) {
       console.error('🔴 Signup error:', error);
-      alert(`Signup failed: ${error.message || 'Unknown error'}`);
+      toast.error(`Signup failed: ${error.message || 'Unknown error'}`);
     }
   }, []);
 
@@ -447,7 +448,7 @@ const App: React.FC = () => {
              : p
          ));
          setEditingPost(null);
-         alert('Post updated successfully!');
+         toast.success('Post updated successfully!');
        } else {
          // Create new post
          const createdPost = await supabaseService.posts.createPost(currentUser.id, {
@@ -475,7 +476,7 @@ const App: React.FC = () => {
        setCurrentView(View.FEED);
      } catch (error) {
        console.error('Create/update post error:', error);
-       alert('Failed to save post');
+       toast.error('Failed to save post');
      }
   }, [currentUser, editingPost]);
 
@@ -607,11 +608,11 @@ const App: React.FC = () => {
         setCurrentUser(updatedProfile);
       }
       
-      alert("Profile updated successfully!");
+      toast.success('Profile updated successfully!');
       setCurrentView(View.PROFILE);
     } catch (error) {
       console.error('Update user error:', error);
-      alert('Failed to update profile');
+      toast.error('Failed to update profile');
     }
   }, [currentUser]);
   
@@ -659,7 +660,7 @@ const App: React.FC = () => {
     // Check if post has votes
     const totalVotes = (post.optionA?.votes ?? 0) + (post.optionB?.votes ?? 0);
     if (totalVotes > 0) {
-      alert('Cannot edit a post that has votes');
+      toast.warning('Cannot edit a post that has votes');
       return;
     }
     
@@ -673,20 +674,20 @@ const App: React.FC = () => {
     try {
       await supabaseService.posts.deletePost(postId);
       setPosts(prevPosts => prevPosts.filter(p => p.id !== postId));
-      alert('Post deleted successfully!');
+      toast.success('Post deleted successfully!');
     } catch (error) {
       console.error('Delete post error:', error);
-      alert('Failed to delete post');
+      toast.error('Failed to delete post');
     }
   }, []);
 
   const handleReportDuplicate = useCallback((postId: string) => {
-    alert(`Reported post ${postId} as duplicate - This would be sent to moderators in a real implementation`);
+    toast.info(`Reported post as duplicate - This would be sent to moderators in a real implementation`);
   }, []);
 
   const handleHidePost = useCallback((postId: string) => {
     // In a real app, this would hide the post from the user's feed
-    alert(`Hidden post ${postId} - This would hide the post from your feed in a real implementation`);
+    toast.info('Post hidden from your feed');
   }, []);
 
   const handleShowUserList = useCallback((listType: 'followers' | 'following', userIds: Set<string>) => {
@@ -724,7 +725,7 @@ const App: React.FC = () => {
   
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-brand-off-white dark:bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-brand-screen-color dark:bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-brand-lime"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">Checking authentication...</p>
@@ -735,7 +736,7 @@ const App: React.FC = () => {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-brand-off-white dark:bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-brand-screen-color dark:bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-brand-lime"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">Loading posts...</p>
