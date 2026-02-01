@@ -2,13 +2,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { VsPost } from '../types';
 
-if (!process.env.API_KEY) {
-  // In a real app, you might provide a mock service or disable the feature.
-  // For this context, we'll log a warning and let it fail at runtime if used.
-  console.warn("API_KEY environment variable not set. AI features will not work.");
+// Get API key - try Vite env first, then process.env (set by vite.config.ts)
+const getApiKey = (): string => {
+  const viteEnv = (import.meta as any).env || {};
+  const windowEnv = (window as any).process?.env || {};
+  return viteEnv.VITE_GEMINI_API_KEY || windowEnv.VITE_GEMINI_API_KEY || windowEnv.GEMINI_API_KEY || windowEnv.API_KEY || process.env.API_KEY || '';
+};
+
+const apiKey = getApiKey();
+
+if (!apiKey) {
+  console.warn("VITE_GEMINI_API_KEY environment variable not set. AI features will not work.");
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+const ai = new GoogleGenAI({ apiKey: apiKey || 'placeholder' });
 
 const textModel = 'gemini-2.5-flash';
 const imageModel = 'imagen-3.0-generate-002';

@@ -17,6 +17,12 @@ env.js
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+
+# BUT allow example/template files (safe to commit)
+!.env.example
+!.env.local.template
 
 # Editor directories and files
 .vscode/*
