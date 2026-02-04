@@ -774,104 +774,124 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                     </div>
                     
                     {/* Buttons at bottom of card */}
-                    <div className="grid grid-cols-2 gap-4 px-4 py-6">
-                        <div className="flex flex-row gap-2 justify-start">
-                            <button 
-                                onClick={() => handleUploadImageClick(leftIndex)} 
-                                className="w-auto bg-gray-900 dark:bg-white text-white dark:text-black py-3 px-4 rounded-2xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-semibold text-xs flex items-center justify-center gap-2"
-                            >
-                                <LuImage className="w-4 h-4" />
-                            </button>
-                            <button 
-                                onClick={() => handleSelectImageClick(leftIndex)} 
-                                className="w-auto bg-gray-900 dark:bg-white text-white dark:text-black py-3 px-4 rounded-2xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-semibold text-xs flex items-center justify-center gap-2"
-                            >
-                                <TbPhotoSearch className="w-4 h-4" />
-                            </button>
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Title and subtitle below card */}
+                        <div className="p-4">
+                            <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
+                                {classicDetails.title || 'Title goes here'}
+                            </p>
+                            {/* <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {classicDetails.optionA_name} vs {classicDetails.optionB_name}
+                            </p> */}
                         </div>
-                        {rightContestant && (
-                            <div className="flex flex-row gap-2 justify-end">
-                                <button 
-                                    onClick={() => handleUploadImageClick(rightIndex)} 
-                                    className="w-auto bg-gray-900 dark:bg-white text-white dark:text-black py-3 px-4 rounded-2xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-semibold text-xs flex items-center justify-center gap-2"
+
+                        {/* Instagram-style Carousel Indicator */}
+                        <div className="flex items-center justify-end px-4">
+                            <div 
+                                className="relative overflow-hidden rounded-2xl border-2 border-[#BECC86] bg-brand-lime px-2"
+                                style={{ maxWidth: '120px' }}
+                            >
+                                <div 
+                                    className="flex items-center justify-center gap-1.5 transition-transform duration-300 ease-out"
+                                    style={{ 
+                                        transform: `translateX(${(() => {
+                                            const maxVisibleDots = 5;
+                                            const dotWidth = 6;
+                                            const gap = 6;
+                                            
+                                            if (totalPairs <= maxVisibleDots) return 0;
+                                            
+                                            const centerIndex = 2;
+                                            let offset = 0;
+                                            
+                                            if (currentPairIndex <= centerIndex) {
+                                                offset = 0;
+                                            } else if (currentPairIndex >= totalPairs - centerIndex - 1) {
+                                                offset = -((totalPairs - maxVisibleDots) * (dotWidth + gap));
+                                            } else {
+                                                offset = -((currentPairIndex - centerIndex) * (dotWidth + gap));
+                                            }
+                                            
+                                            return offset;
+                                        })()}px)`
+                                    }}
                                 >
-                                    <LuImage className="w-4 h-4" />
-                                </button>
-                                <button 
-                                    onClick={() => handleSelectImageClick(rightIndex)} 
-                                    className="w-auto bg-gray-900 dark:bg-white text-white dark:text-black py-3 px-4 rounded-2xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-semibold text-xs flex items-center justify-center gap-2"
-                                >
-                                    <TbPhotoSearch className="w-4 h-4" />
-                                </button>
+                                    {Array.from({ length: totalPairs }).map((_, idx) => {
+                                        const isActive = idx === currentPairIndex;
+                                        const distance = Math.abs(idx - currentPairIndex);
+                                        const scale = distance === 0 ? 1 : distance === 1 ? 0.9 : distance === 2 ? 0.75 : 0.6;
+                                        const opacity = distance <= 2 ? 1 : 0.5;
+                                        
+                                        return isActive ? (
+                                            <div 
+                                                key={idx}
+                                                className="rounded-xl p-0.5 flex-shrink-0"
+                                            >
+                                                <button
+                                                    onClick={() => setCurrentPairIndex(idx)}
+                                                    className="w-7 h-3 rounded-xl bg-zinc-600 transition-all duration-300"
+                                                    title={`Pair ${idx + 1}`}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <button
+                                                key={idx}
+                                                onClick={() => setCurrentPairIndex(idx)}
+                                                className="w-4 h-4 rounded-xl bg-[#BECC86] transition-all duration-300 flex-shrink-0"
+                                                style={{ 
+                                                    transform: `scale(${scale})`,
+                                                    opacity 
+                                                }}
+                                                title={`Pair ${idx + 1}`}
+                                            />
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
                 
-                {/* Instagram-style Carousel Indicator */}
-                <div className="flex items-center justify-center pb-6">
-                    <div 
-                        className="relative overflow-hidden rounded-2xl border-2 border-[#BECC86] bg-brand-lime px-2"
-                        style={{ maxWidth: '120px' }}
-                    >
-                        <div 
-                            className="flex items-center justify-center gap-1.5 transition-transform duration-300 ease-out"
-                            style={{ 
-                                transform: `translateX(${(() => {
-                                    const maxVisibleDots = 5;
-                                    const dotWidth = 6;
-                                    const gap = 6;
-                                    
-                                    if (totalPairs <= maxVisibleDots) return 0;
-                                    
-                                    const centerIndex = 2;
-                                    let offset = 0;
-                                    
-                                    if (currentPairIndex <= centerIndex) {
-                                        offset = 0;
-                                    } else if (currentPairIndex >= totalPairs - centerIndex - 1) {
-                                        offset = -((totalPairs - maxVisibleDots) * (dotWidth + gap));
-                                    } else {
-                                        offset = -((currentPairIndex - centerIndex) * (dotWidth + gap));
-                                    }
-                                    
-                                    return offset;
-                                })()}px)`
-                            }}
-                        >
-                            {Array.from({ length: totalPairs }).map((_, idx) => {
-                                const isActive = idx === currentPairIndex;
-                                const distance = Math.abs(idx - currentPairIndex);
-                                const scale = distance === 0 ? 1 : distance === 1 ? 0.9 : distance === 2 ? 0.75 : 0.6;
-                                const opacity = distance <= 2 ? 1 : 0.5;
-                                
-                                return isActive ? (
-                                    <div 
-                                        key={idx}
-                                        className="rounded-xl p-0.5 flex-shrink-0"
-                                    >
-                                        <button
-                                            onClick={() => setCurrentPairIndex(idx)}
-                                            className="w-7 h-3 rounded-xl bg-zinc-600 transition-all duration-300"
-                                            title={`Pair ${idx + 1}`}
-                                        />
-                                    </div>
-                                ) : (
-                                    <button
-                                        key={idx}
-                                        onClick={() => setCurrentPairIndex(idx)}
-                                        className="w-4 h-4 rounded-xl bg-[#BECC86] transition-all duration-300 flex-shrink-0"
-                                        style={{ 
-                                            transform: `scale(${scale})`,
-                                            opacity 
-                                        }}
-                                        title={`Pair ${idx + 1}`}
-                                    />
-                                );
-                            })}
-                        </div>
-                    </div>
+                
+
+                <div className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-2 gap-1">
+                  <div className="flex flex-row gap-8 justify-start p-4 flex-1 bg-zinc-800 rounded-t-2xl">
+                      <button 
+                          onClick={() => handleUploadImageClick(leftIndex)} 
+                          className="w-auto text-zinc-100 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-2"
+                      >
+                          <LuImage className="w-6 h-6" />
+                          <span className="text-[10px]">Upload</span>
+                      </button>
+                      <button 
+                          onClick={() => handleSelectImageClick(leftIndex)} 
+                          className="w-auto text-zinc-100 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-2"
+                      >
+                          <TbPhotoSearch className="w-6 h-6" />
+                          <span className="text-[10px]">Search</span>
+                      </button>
+                  </div>
+                  {rightContestant && (
+                      <div className="flex flex-row gap-8 justify-end p-4 flex-1 bg-zinc-100 rounded-t-2xl">
+                          <button 
+                              onClick={() => handleUploadImageClick(rightIndex)} 
+                              className="w-auto text-zinc-800 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1"
+                          >
+                              <LuImage className="w-6 h-6" />
+                              <span className="text-[10px]">Upload</span>
+                          </button>
+                          <button 
+                              onClick={() => handleSelectImageClick(rightIndex)} 
+                              className="w-auto text-zinc-800 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1"
+                          >
+                              <TbPhotoSearch className="w-6 h-6" />
+                              <span className="text-[10px]">Search</span>
+                          </button>
+                      </div>
+                  )}
                 </div>
+
+
             </div>
           );
         }
@@ -1038,55 +1058,56 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                     </div>
                     
                     {/* Buttons at bottom of card */}
-                    <div className="grid grid-cols-2 gap-4 px-4 py-6">
-                        <div className="flex flex-row gap-2 justify-start">
-                            <button 
-                                onClick={() => handleUploadImageClick('A')} 
-                                className="w-auto bg-gray-900 dark:bg-white text-white dark:text-black py-3 px-4 rounded-2xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50"
-                                disabled={loadingImages.A}
-                            >
-                                <LuImage className="w-4 h-4" />
-                                {/* Upload */}
-                            </button>
-                            <button 
-                                onClick={() => handleSelectImageClick('A')} 
-                                className="w-auto bg-gray-900 dark:bg-white text-white dark:text-black py-3 px-4 rounded-2xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50"
-                                disabled={loadingImages.A}
-                            >
-                                <TbPhotoSearch className="w-4 h-4" />
-                                {/* Select */}
-                            </button>
-                        </div>
-                        <div className="flex flex-row gap-2 justify-end">
-                            <button 
-                                onClick={() => handleUploadImageClick('B')} 
-                                className="w-auto bg-gray-900 dark:bg-white text-white dark:text-black py-3 px-4 rounded-2xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50"
-                                disabled={loadingImages.B}
-                            >
-                                <LuImage className="w-4 h-4" />
-                                {/* Upload */}
-                            </button>
-                            <button 
-                                onClick={() => handleSelectImageClick('B')} 
-                                className="w-auto bg-gray-900 dark:bg-white text-white dark:text-black py-3 px-4 rounded-2xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50"
-                                disabled={loadingImages.B}
-                            >
-                                <TbPhotoSearch className="w-4 h-4" />
-                                {/* Select */}
-                            </button>
-                        </div>
-                    </div>
+                    
                     {/* Title and subtitle below card */}
-                    {/* <div className="p-4">
+                    <div className="p-4">
                         <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
                             {classicDetails.title || 'Title goes here'}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {/* <p className="text-xs text-gray-500 dark:text-gray-400">
                             {classicDetails.optionA_name} vs {classicDetails.optionB_name}
-                        </p>
-                    </div> */}
+                        </p> */}
+                    </div>
                 </div>
                 
+                <div className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-2 gap-1">
+                  <div className="flex flex-row gap-8 justify-start p-4 flex-1 bg-zinc-800 rounded-t-2xl">
+                      <button 
+                          onClick={() => handleUploadImageClick('A')} 
+                          className="w-auto text-zinc-100 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                          disabled={loadingImages.A}
+                      >
+                          <LuImage className="w-6 h-6" />
+                          <span className="text-[10px]">Upload</span>
+                      </button>
+                      <button 
+                          onClick={() => handleSelectImageClick('A')} 
+                          className="w-auto text-zinc-100 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                          disabled={loadingImages.A}
+                      >
+                          <TbPhotoSearch className="w-6 h-6" />
+                          <span className="text-[10px]">Select</span>
+                      </button>
+                  </div>
+                  <div className="flex flex-row gap-8 justify-end p-4 flex-1 bg-zinc-100 rounded-t-2xl">
+                      <button 
+                          onClick={() => handleUploadImageClick('B')} 
+                          className="w-auto text-zinc-800 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                          disabled={loadingImages.B}
+                      >
+                          <LuImage className="w-6 h-6" />
+                          <span className="text-[10px]">Upload</span>
+                      </button>
+                      <button 
+                          onClick={() => handleSelectImageClick('B')} 
+                          className="w-auto text-zinc-800 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                          disabled={loadingImages.B}
+                      >
+                          <TbPhotoSearch className="w-6 h-6" />
+                          <span className="text-[10px]">Select</span>
+                      </button>
+                  </div>
+                </div>
                 
             </div>
         );
@@ -1115,7 +1136,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
   }
 
   return (
-     <div className="fixed inset-0 bg-brand-screen-color dark:bg-gray-900 z-50 flex flex-col">
+     <div className="bg-brand-screen-color min-h-screen dark:bg-gray-900 z-50 flex flex-col">
         <header className="flex items-center justify-between px-6 py-6 flex-shrink-0">
             <button onClick={step === 'type_choice' ? onClose : handleBack} className="text-gray-800 dark:text-gray-200">
                 <RiArrowLeftLine className="w-7 h-7"/>
