@@ -421,7 +421,7 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
 
   return (
     <div 
-      className={`relative w-full h-full ${allowOverflow ? '' : 'overflow-hidden'} ${containerClassName}`} 
+      className={`relative w-full h-full ${allowOverflow ? '' : 'overflow-hidden'} ${containerClassName} allow-zoom`} 
       ref={containerRef}
     >
       {/* Image */}

@@ -167,7 +167,16 @@ const FeedView: React.FC<FeedViewProps> = ({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {showHighlights && activeTab === 'for_you' && <div className="pt-4 px-2"><HighlightsView posts={latestPosts} onSelectPost={onSelectPost} /></div>}
+        {showHighlights && activeTab === 'for_you' && (
+          <div 
+            className="pt-4 px-2"
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-medium text-zinc-800 dark:text-gray-300 mb-2 px-1">Latest</p>
+            <HighlightsView posts={latestPosts} onSelectPost={onSelectPost} />
+          </div>
+        )}
         
         {title && <h1 className={`text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6 px-4 ${showHighlights ? 'mt-8' : ''}`}>{title}</h1>}
         
