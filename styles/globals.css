@@ -2,8 +2,8 @@
 
 :root {
   /* Brand Colors */
-  --brand-lime: #D4FF00;
-  --brand-lime-secondary: #BECC86;
+  --brand-lime:#cdf804; /*  #D4FF00 */
+  --brand-secondary: #BECC86;
   --brand-off-white: #FBFBF5;
   --brand-screen-color: #f3f2ee;
   

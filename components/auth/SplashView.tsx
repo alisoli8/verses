@@ -29,7 +29,7 @@ const SplashView: React.FC<SplashViewProps> = ({ onGoToSignup, onGoToLogin }) =>
         </button>
         <button
           onClick={onGoToLogin}
-          className="w-full mt-4 text-brand-lime font-bold py-4 rounded-2xl border border-brand-lime text-sm hover:bg-white/10 transition-colors"
+          className="w-full mt-4 text-brand-lime font-bold py-4 rounded-2xl border border-brand-lime text-lg hover:bg-white/10 transition-colors"
         >
           Log In
         </button>

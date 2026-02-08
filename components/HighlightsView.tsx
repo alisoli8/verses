@@ -17,7 +17,7 @@ const HighlightCard = ({ post, onSelect }: { post: VsPost, onSelect: (id: string
             className="flex-shrink-0 w-44 cursor-pointer group"
         >
             <div
-                className="relative w-full h-60 rounded-3xl overflow-hidden transition-transform duration-300 group-hover:-translate-y-1 bg-gray-300 dark:bg-gray-800"
+                className="relative w-full h-60 rounded-3xl overflow-hidden transition-transform duration-300 group-hover:-translate-y-1 bg-gray-300 dark:bg-gray-800 dark:border-gray-300/40 dark:border"
             >
                 <img 
                     src={post.optionA.imageUrl} 

@@ -222,8 +222,8 @@ const PostCard: React.FC<PostCardProps> = ({
   const totalVotes = (post.optionA?.votes ?? 0) + (post.optionB?.votes ?? 0);
 
   return (
-    <div className="dark:bg-gray-800/50 rounded-3xl flex flex-col w-full border border-gray-400/70 dark:border-gray-700/50 overflow-hidden">
-        <div className="flex items-center p-3 border-b border-gray-200 dark:border-gray-700/50">
+    <div className="dark:bg-gray-800/50 rounded-3xl flex flex-col w-full border border-gray-400/70 dark:border-gray-300/50 overflow-hidden">
+        <div className="flex items-center p-3 border-b border-gray-200 dark:border-gray-300/50">
             <img src={post.author.profileImageUrl} alt={post.author.name} className="w-9 h-9 rounded-xl object-cover" />
             <div className="ml-3 flex items-center">
                 <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{post.author.name}</span>

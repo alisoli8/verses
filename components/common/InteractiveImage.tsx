@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { RiExpandDiagonalLine, RiContractUpDownLine, RiDragMove2Line, RiCropLine, RiCheckLine, RiCloseLine } from 'react-icons/ri';
 import { MdOutlinePinch } from 'react-icons/md';
 import { PiResizeBold } from 'react-icons/pi';
+import { SlSizeActual } from 'react-icons/sl';
 
 interface InteractiveImageProps {
   src: string;
@@ -15,6 +16,7 @@ interface InteractiveImageProps {
   onCropConfirm?: (croppedImageUrl: string) => void;
   onCropCancel?: () => void;
   allowOverflow?: boolean;
+  side?: 'A' | 'B';
 }
 
 interface ImageTransform {
@@ -57,7 +59,8 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
   cropMode = false,
   onCropConfirm,
   onCropCancel,
-  allowOverflow = false
+  allowOverflow = false,
+  side = 'A'
 }) => {
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,16 +104,15 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
     y: (touch1.clientY + touch2.clientY) / 2
   });
 
-  // Handle touch start
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
+  // Handle touch start - using native TouchEvent for passive: false support
+  const handleTouchStart = useCallback((e: TouchEvent) => {
     const touches: Touch[] = [];
     for (let i = 0; i < e.touches.length; i++) {
       touches.push(e.touches[i]);
     }
     
     if (touches.length === 1) {
-      // Single touch - prepare for drag
+      // Single touch - prepare for drag (don't preventDefault to allow scroll detection)
       setIsDragging(true);
       setTouchState({
         touches,
@@ -120,7 +122,8 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
         center: { x: touches[0].clientX, y: touches[0].clientY }
       });
     } else if (touches.length === 2) {
-      // Two touches - prepare for pinch
+      // Two touches - prepare for pinch (preventDefault to stop page zoom)
+      if (e.cancelable) e.preventDefault();
       const distance = getDistance(touches[0], touches[1]);
       const center = getCenter(touches[0], touches[1]);
       
@@ -134,9 +137,8 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
     }
   }, [transform]);
 
-  // Handle touch move
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
+  // Handle touch move - using native TouchEvent for passive: false support
+  const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!touchState) return;
 
     const touches: Touch[] = [];
@@ -145,9 +147,15 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
     }
     
     if (touches.length === 1 && isDragging) {
-      // Single touch drag
+      // Single touch drag - only preventDefault after significant movement
       const deltaX = touches[0].clientX - touchState.center.x;
       const deltaY = touches[0].clientY - touchState.center.y;
+      
+      // Only prevent default if we've moved enough to be considered a drag
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      if (distance > 5 && e.cancelable) {
+        e.preventDefault();
+      }
       
       const newTransform = {
         ...transform,
@@ -158,10 +166,11 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
       setTransform(newTransform);
       onTransformChange?.(newTransform);
     } else if (touches.length === 2) {
-      // Two touch pinch/zoom
+      // Two touch pinch/zoom - always preventDefault
+      if (e.cancelable) e.preventDefault();
       const distance = getDistance(touches[0], touches[1]);
       const scaleChange = distance / touchState.initialDistance;
-      const newScale = Math.max(0.5, Math.min(3, touchState.initialScale * scaleChange));
+      const newScale = Math.max(0.5, Math.min(5, touchState.initialScale * scaleChange));
       
       const newTransform = {
         ...transform,
@@ -173,9 +182,9 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
     }
   }, [touchState, isDragging, transform, onTransformChange]);
 
-  // Handle touch end
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
+  // Handle touch end - using native TouchEvent for passive: false support
+  const handleTouchEnd = useCallback((e: TouchEvent) => {
+    // Don't preventDefault on touch end - allow normal behavior
     setIsDragging(false);
     setTouchState(null);
   }, []);
@@ -214,11 +223,11 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
     setTouchState(null);
   }, []);
 
-  // Handle wheel zoom for desktop
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  // Handle wheel zoom for desktop - using native WheelEvent for passive: false support
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const scaleChange = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.5, Math.min(3, transform.scale * scaleChange));
+    const newScale = Math.max(0.1, transform.scale * scaleChange);
     
     const newTransform = {
       ...transform,
@@ -240,6 +249,32 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
       };
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // Touch and wheel event listeners with passive: false to allow preventDefault
+  useEffect(() => {
+    const img = imageRef.current;
+    if (!img) return;
+
+    img.addEventListener('touchstart', handleTouchStart, { passive: false });
+    img.addEventListener('touchmove', handleTouchMove, { passive: false });
+    img.addEventListener('touchend', handleTouchEnd, { passive: false });
+    img.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      img.removeEventListener('touchstart', handleTouchStart);
+      img.removeEventListener('touchmove', handleTouchMove);
+      img.removeEventListener('touchend', handleTouchEnd);
+      img.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleWheel]);
+
+  // Cleanup on unmount - reset any stuck state
+  useEffect(() => {
+    return () => {
+      setIsDragging(false);
+      setTouchState(null);
+    };
+  }, []);
 
   // Crop box handlers
   const handleCropMouseDown = (e: React.MouseEvent, handle?: string) => {
@@ -443,20 +478,16 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
           transition: isDragging ? 'none' : 'transform 0.1s ease-out',
           cursor: isDragging ? 'grabbing' : 'grab'
         }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         onMouseDown={handleMouseDown}
-        onWheel={handleWheel}
         draggable={false}
       />
 
       {/* Always visible controls at top-left */}
       <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
         {/* Pinch icon */}
-        <div className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-lg">
+        {/* <div className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-lg">
           <MdOutlinePinch size={16} />
-        </div>
+        </div> */}
         
         {/* Reset/Resize Button */}
         <button
@@ -464,23 +495,23 @@ const InteractiveImage: React.FC<InteractiveImageProps> = ({
           className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition-colors"
           title="Reset Position & Scale"
         >
-          <PiResizeBold size={16} />
+          <SlSizeActual size={16} />
         </button>
       </div>
       
       {/* Crop mode buttons - checkmark and close */}
       {cropMode && (
-        <div className="absolute top-2 right-2 flex gap-2 z-10">
+        <div className={`absolute top-2 flex gap-2 z-10 ${side === 'A' ? 'right-8' : 'right-4'}`}>
           <button
             onClick={handleCropConfirm}
-            className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-lg"
+            className="p-1 bg-brand-lime text-zinc-800 rounded-lg hover:bg-green-600 transition-colors shadow-lg"
             title="Confirm Crop"
           >
             <RiCheckLine size={20} />
           </button>
           <button
             onClick={onCropCancel}
-            className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-lg"
+            className="p-1 bg-zinc-200 text-zinc-800 rounded-lg hover:bg-red-600 transition-colors shadow-lg"
             title="Cancel Crop"
           >
             <RiCloseLine size={20} />

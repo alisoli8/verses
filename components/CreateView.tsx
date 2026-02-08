@@ -11,6 +11,9 @@ import { LuImage } from 'react-icons/lu';
 import { TbPhotoSearch } from 'react-icons/tb';
 import { posts as postsService } from '../services/supabaseService';
 import { toast } from '../contexts/ToastContext';
+import { PiEyedropperSampleBold } from 'react-icons/pi';
+import { MdOutlineThumbsUpDown } from 'react-icons/md';
+import { LiaLongArrowAltRightSolid } from 'react-icons/lia';
 
 declare global {
     interface Window {
@@ -27,7 +30,7 @@ interface CreationWizardProps {
   editPost?: VsPost | null;
   onClose: () => void;
   onCreateClassic: (postData: Omit<VsPost, 'id' | 'userVote' | 'author' | 'comments' | 'topic' | 'type'>) => void;
-  onCreateMatchUp: (title: string, challengers: string[]) => Promise<void>;
+  onCreateMatchUp: (title: string, challengers: { name: string; imageUrl: string }[]) => Promise<void>;
 }
 
 const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClose, onCreateClassic, onCreateMatchUp }) => {
@@ -280,10 +283,14 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
         onCreateClassic(finalPost);
     } else if (step === 'images' && creationType === 'match-up') {
         // Post Match Up with images
-        const challengers = matchUpDetails.challengers.split(',').map(c => c.trim()).filter(Boolean);
+        const challengerNames = matchUpDetails.challengers.split(',').map(c => c.trim()).filter(Boolean);
+        const challengersWithImages = challengerNames.map((name, idx) => ({
+            name,
+            imageUrl: matchUpImages[idx] || ''
+        }));
         setIsProcessing(true);
         try {
-            await onCreateMatchUp(matchUpDetails.title, challengers);
+            await onCreateMatchUp(matchUpDetails.title, challengersWithImages);
         } catch (error) {
             toast.error('Failed to create match up. Please try again.');
             console.error(error);
@@ -497,6 +504,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                 cropMode={cropMode}
                 onCropConfirm={(croppedUrl) => handleMatchUpCropConfirm(index, croppedUrl)}
                 onCropCancel={() => handleMatchUpCropCancel(index)}
+                side={side}
               />
             </div>
             
@@ -507,8 +515,8 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                 onClick={() => handleMatchUpToggleCrop(index)}
                 className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors shadow-lg ${
                   cropMode
-                    ? 'bg-brand-lime text-black'
-                    : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-brand-lime text-zinc-800'
+                    : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-800 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
                 title="Crop"
               >
@@ -519,30 +527,70 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
               <div className="relative">
                 <button
                   onClick={() => handleMatchUpToggleColorPicker(index)}
-                  className="w-10 h-10 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shadow-lg"
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors shadow-lg ${
+                    showColorPicker
+                      ? 'bg-brand-lime text-zinc-800'
+                      : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-800 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
                   title="Background Color"
                 >
-                  <TbPalette className="w-5 h-5 text-gray-900 dark:text-white" />
+                  <TbPalette className="w-5 h-5" />
                 </button>
                 
                 {/* Color picker popup */}
                 {showColorPicker && (
-                  <div className="absolute bottom-12 left-0 bg-white dark:bg-gray-800 rounded-2xl p-3 shadow-xl z-50 min-w-[180px]">
-                    <input
-                      type="color"
-                      value={bgColor}
-                      onChange={(e) => handleMatchUpBackgroundColorChange(index, e.target.value)}
-                      className="w-full h-10 rounded-lg cursor-pointer"
-                    />
-                    <div className="grid grid-cols-4 gap-2 mt-2">
-                      {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'].map(color => (
-                        <button
-                          key={color}
-                          onClick={() => handleMatchUpBackgroundColorChange(index, color)}
-                          className="w-8 h-8 rounded-lg border-2 border-gray-300 dark:border-gray-600"
-                          style={{ backgroundColor: color }}
+                  <div className={`absolute bottom-12 bg-zinc-50 dark:bg-gray-800 rounded-2xl p-2 shadow-xl z-50 w-[120px] ${side === 'A' ? 'left-[calc(50%-40px)]' : 'left-[calc(50%-80px)]'}`}>
+                    {/* Color wheel input */}
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-full h-16 rounded-xl overflow-hidden">
+                        <input
+                          type="color"
+                          value={bgColor}
+                          onChange={(e) => handleMatchUpBackgroundColorChange(index, e.target.value)}
+                          className="w-full h-full cursor-pointer border-0 p-0 outline-none rounded-3xl"
+                          style={{ WebkitAppearance: 'none' }}
                         />
-                      ))}
+                      </div>
+                      
+                      {/* Current color preview and hex input */}
+                      {/* <div className="flex items-center gap-2 w-full">
+                        <div 
+                          className="w-10 h-10 rounded-lg border-2 border-gray-300 dark:border-gray-600 flex-shrink-0"
+                          style={{ backgroundColor: bgColor }}
+                        />
+                        <input
+                          type="text"
+                          value={bgColor.toUpperCase()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) {
+                              handleMatchUpBackgroundColorChange(index, val);
+                            }
+                          }}
+                          className="flex-1 px-2 py-1 text-sm font-mono bg-gray-100 dark:bg-gray-700 rounded-lg text-center"
+                          maxLength={7}
+                        />
+                      </div> */}
+                      
+                      {/* Eyedropper button */}
+                      {'EyeDropper' in window && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              // @ts-ignore - EyeDropper API
+                              const eyeDropper = new window.EyeDropper();
+                              const result = await eyeDropper.open();
+                              handleMatchUpBackgroundColorChange(index, result.sRGBHex);
+                            } catch (e) {
+                              // User cancelled or API not supported
+                            }
+                          }}
+                          className="w-full py-2 px-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-colors"
+                        >
+                          <PiEyedropperSampleBold className="w-5 h-5 mr-1" />
+                          Select
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -563,7 +611,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
             onClick={() => handleUploadImageClick(index)}
             className="w-full h-full flex flex-col items-center justify-center text-center cursor-pointer hover:opacity-80 transition-opacity"
           >
-            <LuImage className={`w-9 h-9 mx-auto mb-2 ${side === 'A' ? 'text-white' : 'text-gray-400'}`} />
+            <LuImage className={`w-9 h-9 mx-auto mb-2 ${side === 'A' ? 'text-white' : 'text-gray-700'}`} />
             <p className={`font-semibold text-base ${side === 'A' ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{name}</p>
           </button>
         )}
@@ -645,7 +693,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                   <button
                       type="button"
                       onClick={handleToggleListening}
-                      className={`w-14 h-14 rounded-2xl mx-auto transition-all duration-300 flex items-center justify-center ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white'}`}
+                      className={`w-14 h-14 rounded-2xl mx-auto transition-all duration-300 flex items-center justify-center ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-[#e3ebc1] dark:bg-gray-800 text-gray-900 dark:text-zinc-50'}`}
                       aria-label={isListening ? 'Stop listening' : 'Start voice input'}
                   >
                       <RiMicLine className="w-6 h-6" />
@@ -695,7 +743,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                   <button
                       type="button"
                       onClick={isListening ? stopListening : startListening}
-                      className={`w-14 h-14 rounded-2xl mx-auto transition-all duration-300 flex items-center justify-center ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white'}`}
+                      className={`w-14 h-14 rounded-2xl mx-auto transition-all duration-300 flex items-center justify-center ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-[#e3ebc1] dark:bg-gray-800 text-gray-900 dark:text-zinc-50'}`}
                       aria-label={isListening ? 'Stop listening' : 'Start voice input'}
                   >
                       <RiMicLine className="w-6 h-6" />
@@ -716,7 +764,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
           const rightContestant = challengers[rightIndex] || null;
 
           return (
-            <div className="flex-grow flex flex-col w-full bg-brand-screen-color dark:bg-gray-900 px-2">
+            <div className="flex-grow flex flex-col w-full bg-brand-screen-color dark:bg-gray-900 px-2 pb-20">
                 {/* Card Container */}
                 <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-300 dark:border-gray-700 mb-2">
                     {/* Header with title and aspect ratio controls */}
@@ -725,7 +773,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setAspectRatio('1/1.2')}
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
                                     aspectRatio === '1/1.2'
                                         ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
                                         : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
@@ -738,7 +786,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                             </button>
                             <button
                                 onClick={() => setAspectRatio('1/1.5')}
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
                                     aspectRatio === '1/1.5'
                                         ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
                                         : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
@@ -854,35 +902,35 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                 
                 
 
-                <div className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-2 gap-1">
-                  <div className="flex flex-row gap-8 justify-start p-4 flex-1 bg-zinc-800 rounded-t-2xl">
+                <div className="fixed bottom-4 left-0 right-0 z-50 grid grid-cols-2 w-[95%] mx-auto rounded-3xl">
+                  <div className="flex flex-row gap-8 justify-start flex-1 bg-zinc-800 py-4 px-6 rounded-tl-3xl rounded-bl-3xl" style={{ clipPath: 'polygon(0% 0%, 98% 0%, 100% 100%, 0% 100%)' }}>
                       <button 
                           onClick={() => handleUploadImageClick(leftIndex)} 
-                          className="w-auto text-zinc-100 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-2"
+                          className="w-auto text-zinc-100 rounded-3xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1"
                       >
                           <LuImage className="w-6 h-6" />
                           <span className="text-[10px]">Upload</span>
                       </button>
                       <button 
                           onClick={() => handleSelectImageClick(leftIndex)} 
-                          className="w-auto text-zinc-100 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-2"
+                          className="w-auto text-zinc-100 rounded-3xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1"
                       >
                           <TbPhotoSearch className="w-6 h-6" />
                           <span className="text-[10px]">Search</span>
                       </button>
                   </div>
                   {rightContestant && (
-                      <div className="flex flex-row gap-8 justify-end p-4 flex-1 bg-zinc-100 rounded-t-2xl">
+                      <div className="flex flex-row gap-8 justify-end flex-1 bg-zinc-100 py-4 px-6 rounded-tr-3xl rounded-br-3xl" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 2% 100%)' }}>
                           <button 
                               onClick={() => handleUploadImageClick(rightIndex)} 
-                              className="w-auto text-zinc-800 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1"
+                              className="w-auto text-zinc-800 rounded-3xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1"
                           >
                               <LuImage className="w-6 h-6" />
                               <span className="text-[10px]">Upload</span>
                           </button>
                           <button 
                               onClick={() => handleSelectImageClick(rightIndex)} 
-                              className="w-auto text-zinc-800 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1"
+                              className="w-auto text-zinc-800 rounded-3xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1"
                           >
                               <TbPhotoSearch className="w-6 h-6" />
                               <span className="text-[10px]">Search</span>
@@ -898,7 +946,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
         
         // Classic view
         return (
-            <div className="flex-grow flex flex-col w-full bg-brand-screen-color dark:bg-gray-900 px-2">
+            <div className="flex-grow flex flex-col w-full bg-brand-screen-color dark:bg-gray-900 px-2 pb-20">
                 {/* Card Container */}
                 <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-300 dark:border-gray-700">
                     {/* Header with title and aspect ratio controls */}
@@ -907,7 +955,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setAspectRatio('1/1.2')}
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
                                     aspectRatio === '1/1.2'
                                         ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
                                         : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
@@ -920,7 +968,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                             </button>
                             <button
                                 onClick={() => setAspectRatio('1/1.5')}
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
                                     aspectRatio === '1/1.5'
                                         ? 'bg-gray-900 dark:bg-white text-white dark:text-black'
                                         : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
@@ -968,6 +1016,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                                                 cropMode={cropModeActive[opt.target as 'A' | 'B']}
                                                 onCropConfirm={(croppedUrl) => handleCropConfirm(opt.target as 'A' | 'B', croppedUrl)}
                                                 onCropCancel={() => handleCropCancel(opt.target as 'A' | 'B')}
+                                                side={opt.target as 'A' | 'B'}
                                             />
                                         </div>
                                         
@@ -978,8 +1027,8 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                                                 onClick={() => handleToggleCrop(opt.target as 'A' | 'B')}
                                                 className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors shadow-lg ${
                                                     cropModeActive[opt.target as 'A' | 'B']
-                                                        ? 'bg-brand-lime text-black'
-                                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                        ? 'bg-brand-lime text-zinc-800'
+                                                        : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
                                                 title="Crop"
                                             >
@@ -990,30 +1039,68 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                                             <div className="relative">
                                                 <button
                                                     onClick={() => handleToggleColorPicker(opt.target as 'A' | 'B')}
-                                                    className="w-10 h-10 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shadow-lg"
+                                                    className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors shadow-lg ${
+                                                      showColorPicker[opt.target as 'A' | 'B']
+                                                        ? 'bg-brand-lime text-zinc-800'
+                                                        : 'bg-zinc-50 dark:bg-gray-800 text-zinc-800 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                    }`}
                                                     title="Background Color"
                                                 >
-                                                    <TbPalette className="w-5 h-5 text-gray-900 dark:text-white" />
+                                                    <TbPalette className="w-5 h-5 text-zinc-800 dark:text-white" />
                                                 </button>
                                                 
                                                 {/* Color picker popup */}
                                                 {showColorPicker[opt.target as 'A' | 'B'] && (
-                                                    <div className="absolute bottom-12 left-0 bg-white dark:bg-gray-800 rounded-2xl p-3 shadow-xl z-50 min-w-[180px]">
-                                                        <input
-                                                            type="color"
-                                                            value={backgroundColors[opt.target as 'A' | 'B']}
-                                                            onChange={(e) => handleBackgroundColorChange(opt.target as 'A' | 'B', e.target.value)}
-                                                            className="w-full h-10 rounded-lg cursor-pointer"
-                                                        />
-                                                        <div className="grid grid-cols-4 gap-2 mt-2">
-                                                            {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'].map(color => (
-                                                                <button
-                                                                    key={color}
-                                                                    onClick={() => handleBackgroundColorChange(opt.target as 'A' | 'B', color)}
-                                                                    className="w-8 h-8 rounded-lg border-2 border-gray-300 dark:border-gray-600"
-                                                                    style={{ backgroundColor: color }}
+                                                    <div className={`absolute bottom-12 bg-zinc-50 dark:bg-gray-800 rounded-2xl p-1 shadow-xl z-50 w-[120px] ${opt.target === 'A' ? 'left-[calc(50%-60px)]' : 'left-[calc(50%-80px)]'}`}>
+                                                        {/* Color wheel input */}
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <input
+                                                                type="color"
+                                                                value={backgroundColors[opt.target as 'A' | 'B']}
+                                                                onChange={(e) => handleBackgroundColorChange(opt.target as 'A' | 'B', e.target.value)}
+                                                                className="w-full h-16 rounded-3xl outline-none cursor-pointer border-0 p-0 overflow-hidden"
+                                                                style={{ WebkitAppearance: 'none' }}
+                                                            />
+                                                            
+                                                            {/* Current color preview and hex input */}
+                                                            {/* <div className="flex items-center gap-2 w-full">
+                                                                <div 
+                                                                    className="w-10 h-10 rounded-lg border-2 border-gray-300 dark:border-gray-600 flex-shrink-0"
+                                                                    style={{ backgroundColor: backgroundColors[opt.target as 'A' | 'B'] }}
                                                                 />
-                                                            ))}
+                                                                <input
+                                                                    type="text"
+                                                                    value={backgroundColors[opt.target as 'A' | 'B'].toUpperCase()}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value;
+                                                                        if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) {
+                                                                            handleBackgroundColorChange(opt.target as 'A' | 'B', val);
+                                                                        }
+                                                                    }}
+                                                                    className="flex-1 px-2 py-1 text-sm font-mono bg-gray-100 dark:bg-gray-700 rounded-lg text-center text-xs"
+                                                                    maxLength={7}
+                                                                />
+                                                            </div> */}
+                                                            
+                                                            {/* Eyedropper button */}
+                                                            {'EyeDropper' in window && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            // @ts-ignore - EyeDropper API
+                                                                            const eyeDropper = new window.EyeDropper();
+                                                                            const result = await eyeDropper.open();
+                                                                            handleBackgroundColorChange(opt.target as 'A' | 'B', result.sRGBHex);
+                                                                        } catch (e) {
+                                                                            // User cancelled or API not supported
+                                                                        }
+                                                                    }}
+                                                                    className="w-full py-2 px-3 bg-zinc-200 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg flex items-center justify-center gap-2 text-xs font-medium transition-colors"
+                                                                >
+                                                                    <PiEyedropperSampleBold className="w-4 h-4 mr-1" />
+                                                                    Select
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 )}
@@ -1036,7 +1123,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                                         onClick={() => handleUploadImageClick(opt.target as 'A' | 'B')}
                                         className="w-full h-full flex flex-col items-center justify-center text-center cursor-pointer hover:opacity-80 transition-opacity"
                                     >
-                                        <LuImage className={`w-9 h-9 mx-auto mb-2 ${opt.target === 'A' ? 'text-white' : 'text-gray-400'}`} />
+                                        <LuImage className={`w-9 h-9 mx-auto mb-2 ${opt.target === 'A' ? 'text-white' : 'text-gray-700'}`} />
                                         <p className={`font-semibold text-base ${opt.target === 'A' ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{opt.name}</p>
                                     </button>
                                 )}
@@ -1070,11 +1157,11 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                     </div>
                 </div>
                 
-                <div className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-2 gap-1">
-                  <div className="flex flex-row gap-8 justify-start p-4 flex-1 bg-zinc-800 rounded-t-2xl">
+                <div className="fixed bottom-4 left-0 right-0 z-50 grid grid-cols-2 w-[95%] mx-auto rounded-3xl">
+                  <div className="flex flex-row gap-8 justify-start py-4 px-6 flex-1 bg-zinc-800 rounded-tl-3xl rounded-bl-3xl" style={{ clipPath: 'polygon(0% 0%, 98% 0%, 100% 100%, 0% 100%)' }}>
                       <button 
                           onClick={() => handleUploadImageClick('A')} 
-                          className="w-auto text-zinc-100 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                          className="w-auto text-zinc-100 rounded-3xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
                           disabled={loadingImages.A}
                       >
                           <LuImage className="w-6 h-6" />
@@ -1082,17 +1169,17 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                       </button>
                       <button 
                           onClick={() => handleSelectImageClick('A')} 
-                          className="w-auto text-zinc-100 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                          className="w-auto text-zinc-100 rounded-3xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
                           disabled={loadingImages.A}
                       >
                           <TbPhotoSearch className="w-6 h-6" />
                           <span className="text-[10px]">Select</span>
                       </button>
                   </div>
-                  <div className="flex flex-row gap-8 justify-end p-4 flex-1 bg-zinc-100 rounded-t-2xl">
+                  <div className="flex flex-row gap-8 justify-end py-4 px-6 flex-1 bg-zinc-100 rounded-tr-3xl rounded-br-3xl" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 2% 100%)' }}>
                       <button 
                           onClick={() => handleUploadImageClick('B')} 
-                          className="w-auto text-zinc-800 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                          className="w-auto text-zinc-800 rounded-3xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
                           disabled={loadingImages.B}
                       >
                           <LuImage className="w-6 h-6" />
@@ -1100,7 +1187,7 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
                       </button>
                       <button 
                           onClick={() => handleSelectImageClick('B')} 
-                          className="w-auto text-zinc-800 rounded-2xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                          className="w-auto text-zinc-800 rounded-3xl transition-colors font-semibold text-xs flex flex-col items-center justify-center gap-1 disabled:opacity-50"
                           disabled={loadingImages.B}
                       >
                           <TbPhotoSearch className="w-6 h-6" />
@@ -1145,11 +1232,12 @@ const CreationWizard: React.FC<CreationWizardProps> = ({ posts, editPost, onClos
             <button
                 onClick={handleNext}
                 disabled={isNextDisabled()}
-                className={`font-semibold py-2.5 px-6 rounded-2xl transition-colors flex items-center justify-center min-w-[80px] 
+                className={`font-semibold py-2.5 px-4 rounded-2xl transition-colors flex items-center justify-center gap-8 min-w-[80px] 
                   ${step === 'type_choice' ? 'invisible' : ''} 
-                  ${isNextDisabled() ? 'bg-transparent border border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-brand-lime border-2 border-[#BECC86] text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                  ${isNextDisabled() ? 'bg-transparent border-2 border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-brand-lime border-2 border-[#BECC86] text-gray-800'}`}
             >
                 {getButtonText()}
+                <LiaLongArrowAltRightSolid className="w-5 h-5 ml-1" />
             </button>
         </header>
 
@@ -1177,7 +1265,7 @@ interface CreateViewProps {
   onBack: () => void;
   onCreateWithAI: (topic: string) => Promise<void>;
   onCreateClassic: (postData: Omit<VsPost, 'id' | 'userVote' | 'author' | 'comments' | 'topic' | 'type'>) => void;
-  onCreateMatchUp: (title: string, challengers: string[]) => Promise<void>;
+  onCreateMatchUp: (title: string, challengers: { name: string; imageUrl: string }[]) => Promise<void>;
 }
 
 const CreateView: React.FC<CreateViewProps> = ({ posts, editPost, onBack, onCreateWithAI, onCreateClassic, onCreateMatchUp }) => {
@@ -1218,9 +1306,9 @@ const CreateView: React.FC<CreateViewProps> = ({ posts, editPost, onBack, onCrea
           <RiArrowLeftLine className="w-7 h-7" />
       </button>
 
-      <div className="flex-grow flex flex-col justify-between py-20">
-          <div className="mt-12">
-              <h2 className="text-5xl font-bold text-gray-900 dark:text-gray-100 leading-[1.1]">
+      <div className="flex-grow flex flex-col justify-between py-10">
+          <div className="mt-20">
+              <h2 className="text-4xl font-bold text-gray-900 dark:text-gray-100 leading-[1.1]">
                   Create your battle and let People decide who the winner is
               </h2>
           </div>
@@ -1261,9 +1349,12 @@ const CreateView: React.FC<CreateViewProps> = ({ posts, editPost, onBack, onCrea
           <div className="w-full">
                <button 
                   onClick={() => setMode('wizard')} 
-                  className="w-full text-lg bg-brand-lime border-2 border-[#BECC86] hover:bg-brand-lime/90 text-zinc-800 dark:text-zinc-200 font-bold p-5 rounded-3xl transition-all text-left"
+                  className="flex flex-row items-center justify-between w-full text-lg bg-brand-lime border-2 border-[#BECC86] hover:bg-brand-lime/90 text-zinc-800 font-bold py-2 px-4 rounded-3xl transition-all text-left"
                >
                   Create my own
+                  <span className="ml-2 p-3 rounded-full bg-zinc-800 text-white flex items-center justify-center">
+                    <MdOutlineThumbsUpDown className="w-7 h-7" />
+                  </span>
                </button>
           </div>
       </div>
