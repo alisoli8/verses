@@ -95,26 +95,52 @@ const FeedView: React.FC<FeedViewProps> = ({
     handleSwipe();
   };
 
+  // Track touch position for mobile scroll detection
+  const touchStartY = useRef(0);
+
+  // Scroll-based tab visibility
   useEffect(() => {
     if (!showHighlights) return;
 
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      
-      // Show tabs when scrolling up, hide when scrolling down
-      if (currentScrollY < lastScrollY.current) {
-        // Scrolling up
-        setShowTabs(true);
-      } else if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
-        // Scrolling down (and past 50px to avoid hiding immediately)
+    // Wheel event for desktop/trackpad
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY > 0) {
         setShowTabs(false);
+      } else if (e.deltaY < 0) {
+        setShowTabs(true);
       }
-      
-      lastScrollY.current = currentScrollY;
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    // Touch events for real mobile devices
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY.current = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const touchY = e.touches[0].clientY;
+      const deltaY = touchStartY.current - touchY;
+      
+      // Scrolling down (finger moving up)
+      if (deltaY > 10) {
+        setShowTabs(false);
+        touchStartY.current = touchY;
+      }
+      // Scrolling up (finger moving down)
+      else if (deltaY < -10) {
+        setShowTabs(true);
+        touchStartY.current = touchY;
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+    };
   }, [showHighlights]);
 
   const displayedPosts = useMemo(() => {
@@ -160,7 +186,8 @@ const FeedView: React.FC<FeedViewProps> = ({
           </div>
         </div>
       )}
-
+      
+      
       <div 
         ref={contentRef}
         className="max-w-xl mx-auto"

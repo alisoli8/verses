@@ -1,11 +1,20 @@
 // Serper API Service - Google Image Search
 // https://serper.dev/ - Fast and affordable Google Search API
-// Now proxied through /api/serper to keep API keys secure
+// In local dev, calls API directly. In production, uses /api/serper proxy.
+
+// Check if running in local development
+const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+// Get env vars for local dev
+const getEnvVar = (key: string): string => {
+  const viteEnv = (import.meta as any).env;
+  return viteEnv?.[key] || '';
+};
 
 // ============================================
 // TOGGLE: Set to false to disable Serper
 // ============================================
-const SERPER_ENABLED = false;
+const SERPER_ENABLED = true;
 
 export interface SerperImageResult {
   title: string;
@@ -32,7 +41,8 @@ interface SerperImageResponse {
 
 class SerperService {
   /**
-   * Search for images using Serper (Google Images) via API proxy
+   * Search for images using Serper (Google Images)
+   * In local dev, calls API directly. In production, uses proxy.
    * @param query - Search term (e.g., "mountain", "BMW", "LeBron James")
    * @param num - Number of images to return (default 20)
    * @returns Promise with image search results
@@ -43,7 +53,34 @@ class SerperService {
     }
 
     try {
-      // Call our API proxy instead of Serper directly
+      // In local dev, call Serper API directly
+      if (isLocalDev) {
+        const apiKey = getEnvVar('VITE_SERPER_API_KEY');
+        if (!apiKey) {
+          throw new Error('Serper API key not configured in .env.local');
+        }
+
+        const response = await fetch('https://google.serper.dev/images', {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            q: query.trim(),
+            num: Math.min(num, 100),
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Serper API error: ${response.status}`);
+        }
+
+        const data: SerperImageResponse = await response.json();
+        return data.images || [];
+      }
+
+      // In production, call our API proxy
       const response = await fetch('/api/serper', {
         method: 'POST',
         headers: {

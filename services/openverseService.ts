@@ -1,5 +1,15 @@
 // Openverse API Service
 // Provides access to Creative Commons and public domain images
+// In local dev, calls API directly. In production, uses /api/openverse proxy.
+
+// Check if running in local development
+const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+// Get env vars for local dev
+const getEnvVar = (key: string): string => {
+  const viteEnv = (import.meta as any).env;
+  return viteEnv?.[key] || '';
+};
 
 interface OpenverseImageResult {
   id: string;
@@ -40,8 +50,52 @@ interface OpenverseSearchResponse {
 }
 
 class OpenverseService {
+  private accessToken: string | null = null;
+  private tokenExpiry: number = 0;
+
   /**
-   * Search for images using Openverse API via proxy
+   * Get access token for local dev (direct API calls)
+   */
+  private async getAccessToken(): Promise<string> {
+    const clientId = getEnvVar('VITE_OPENVERSE_CLIENT_ID');
+    const clientSecret = getEnvVar('VITE_OPENVERSE_CLIENT_SECRET');
+
+    if (!clientId || !clientSecret) {
+      throw new Error('Openverse credentials not configured in .env.local');
+    }
+
+    // Return cached token if still valid
+    if (this.accessToken && Date.now() < this.tokenExpiry) {
+      return this.accessToken;
+    }
+
+    // Get new token
+    const response = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get Openverse token: ${response.status}`);
+    }
+
+    const data = await response.json();
+    this.accessToken = data.access_token;
+    this.tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+
+    return this.accessToken!;
+  }
+
+  /**
+   * Search for images using Openverse API
+   * In local dev, calls API directly. In production, uses proxy.
    * @param query - Search term (e.g., "kobe", "pizza vs burger")
    * @param page - Page number (1-based)
    * @param pageSize - Number of images per page (max 500)
@@ -57,7 +111,31 @@ class OpenverseService {
     }
 
     try {
-      // Call our API proxy instead of Openverse directly
+      // In local dev, call Openverse API directly
+      if (isLocalDev) {
+        const token = await this.getAccessToken();
+        const params = new URLSearchParams({
+          q: query.trim(),
+          page: page.toString(),
+          page_size: Math.min(pageSize, 500).toString(),
+          mature: 'false',
+        });
+
+        const response = await fetch(`https://api.openverse.org/v1/images/?${params}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Openverse API error: ${response.status}`);
+        }
+
+        const data: OpenverseSearchResponse = await response.json();
+        return data.results || [];
+      }
+
+      // In production, call our API proxy
       const response = await fetch('/api/openverse', {
         method: 'POST',
         headers: {

@@ -15,6 +15,7 @@ import { generateNewVsPost, generateImage } from './services/geminiService';
 import { RiShare2Line, RiLink } from 'react-icons/ri';
 import CommentSheet from './components/common/CommentSheet';
 import UserListSheet from './components/common/UserListSheet';
+import ConfirmModal from './components/common/ConfirmModal';
 import supabaseService from './services/supabaseService';
 import { toast } from './contexts/ToastContext';
 
@@ -89,6 +90,11 @@ const App: React.FC = () => {
     title: string;
     userIds: Set<string>;
   }>({ isOpen: false, title: '', userIds: new Set() });
+
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    isOpen: boolean;
+    postId: string | null;
+  }>({ isOpen: false, postId: null });
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
@@ -212,7 +218,19 @@ const App: React.FC = () => {
   
   const handleLogin = useCallback(async (email: string, password: string = 'password123') => {
     try {
-      await supabaseService.auth.signIn(email, password);
+      const session = await supabaseService.auth.signIn(email, password);
+      if (session?.user) {
+        console.log('🔵 Login successful, fetching profile...');
+        const profile = await supabaseService.profiles.getProfile(session.user.id);
+        if (profile) {
+          console.log('✅ Profile loaded after login:', profile.name);
+          setCurrentUser(profile);
+        } else {
+          console.warn('⚠️ No profile found after login');
+          toast.error('Profile not found. Please sign up first.');
+          await supabaseService.auth.signOut();
+        }
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(`Login failed: ${error.message}`);
@@ -239,7 +257,7 @@ const App: React.FC = () => {
   const handleLogout = useCallback(async () => {
     try {
       await supabaseService.auth.signOut();
-      setCurrentView(View.FEED);
+      setCurrentUser(null); // Directly set to null to ensure UI updates
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -480,43 +498,41 @@ const App: React.FC = () => {
      }
   }, [currentUser, editingPost]);
 
-  const handleCreateMatchUpPost = useCallback(async (title: string, challengers: string[]) => {
+  const handleCreateMatchUpPost = useCallback(async (title: string, challengers: { name: string; imageUrl: string }[]) => {
     if (!currentUser) return;
 
-    const imagePromises = challengers.map(name => generateImage(name, title));
-    const imageUrls = await Promise.all(imagePromises);
-    
-    const contenders = challengers.map((name, index) => ({
-      name,
-      imageUrl: imageUrls[index]
-    }));
+    try {
+      const shuffled = [...challengers].sort(() => 0.5 - Math.random());
+      const first = shuffled.pop()!;
+      const second = shuffled.pop()!;
 
-    const shuffled = [...contenders].sort(() => 0.5 - Math.random());
-    const first = shuffled.pop()!;
-    const second = shuffled.pop()!;
+      // Save to Supabase
+      const createdPost = await supabaseService.posts.createPost(currentUser.id, {
+        type: 'match-up',
+        title,
+        topic: title,
+        option_a_name: first.name,
+        option_a_image: first.imageUrl,
+        option_a_votes: 0,
+        option_b_name: second.name,
+        option_b_image: second.imageUrl,
+        option_b_votes: 0,
+        likes: 0,
+        shares: 0,
+        challengers: shuffled,
+        initial_challengers: [...challengers],
+        eliminated: [],
+        champion: null,
+        round_results: [],
+      });
 
-    const newPost: VsPost = {
-      id: new Date().getTime().toString(),
-      type: 'match-up',
-      title,
-      topic: title,
-      author: { id: currentUser.id, name: currentUser.name, profileImageUrl: currentUser.profileImageUrl },
-      comments: [],
-      userVote: null,
-      likes: 0,
-      shares: 0,
-      challengers: shuffled,
-      initialChallengers: contenders,
-      eliminated: [],
-      roundResults: [],
-      userPicks: [],
-      currentRoundVoted: false,
-      userChampionSide: null,
-      optionA: { name: first.name, imageUrl: first.imageUrl, votes: 0 },
-      optionB: { name: second.name, imageUrl: second.imageUrl, votes: 0 }
-    };
-    setPosts(prev => [newPost, ...prev]);
-    setCurrentView(View.FEED);
+      setPosts(prev => [createdPost, ...prev]);
+      setCurrentView(View.FEED);
+      toast.success('Match-up created successfully!');
+    } catch (error) {
+      console.error('Create matchup post error:', error);
+      toast.error('Failed to create match-up');
+    }
   }, [currentUser]);
 
   const handleMatchUpVote = useCallback((postId: string, winner: VsOption, loser: VsOption, winnerSide: 'A' | 'B') => {
@@ -668,8 +684,13 @@ const App: React.FC = () => {
     setCurrentView(View.CREATE);
   }, [posts]);
 
-  const handleDeletePost = useCallback(async (postId: string) => {
-    if (!confirm('Are you sure you want to delete this post?')) return;
+  const handleDeletePost = useCallback((postId: string) => {
+    setDeleteConfirmState({ isOpen: true, postId });
+  }, []);
+
+  const confirmDeletePost = useCallback(async () => {
+    const postId = deleteConfirmState.postId;
+    if (!postId) return;
     
     try {
       await supabaseService.posts.deletePost(postId);
@@ -679,7 +700,7 @@ const App: React.FC = () => {
       console.error('Delete post error:', error);
       toast.error('Failed to delete post');
     }
-  }, []);
+  }, [deleteConfirmState.postId]);
 
   const handleReportDuplicate = useCallback((postId: string) => {
     toast.info(`Reported post as duplicate - This would be sent to moderators in a real implementation`);
@@ -831,6 +852,16 @@ const App: React.FC = () => {
           usersToShow={userListSheetUsers}
           currentUser={currentUser}
           onFollowToggle={handleFollowToggle}
+       />
+       <ConfirmModal
+          isOpen={deleteConfirmState.isOpen}
+          onClose={() => setDeleteConfirmState({ isOpen: false, postId: null })}
+          onConfirm={confirmDeletePost}
+          title="Delete Post"
+          message="Are you sure you want to delete this post? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          confirmVariant="danger"
        />
     </div>
   );
